@@ -15,6 +15,7 @@ from src.network import check_internet, web_search
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 HISTORY_FILE = DATA_DIR / "chat_history.json"
+PUNCTUATION = ".,!?;:()\"'।"
 
 
 def load_history() -> list[dict[str, str]]:
@@ -29,6 +30,7 @@ def load_history() -> list[dict[str, str]]:
 
 
 def save_message(history: list[dict[str, str]], role: str, message: str) -> None:
+    """Add one message to the history and write the history file."""
     history.append({
         "role": role,
         "message": message,
@@ -62,22 +64,28 @@ Commands / কমান্ড:
   exit             - Close LISA
 
 বাংলা বা English-এ সাধারণ মেসেজও লিখতে পারো।
-এই সংস্করণে এখনো AI model যুক্ত হয়নি।
+এই সংস্করণে এখনো AI model যুক্ত হয়নি।
 """)
+
+
+def _has_any(text: str, words: tuple[str, ...], phrases: tuple[str, ...] = ()) -> bool:
+    """Match whole words (so "hi" does not match "this") or exact phrases."""
+    tokens = {token.strip(PUNCTUATION) for token in text.split()}
+    return any(word in tokens for word in words) or any(phrase in text for phrase in phrases)
 
 
 def make_reply(message: str) -> str:
     text = message.strip().casefold()
-    if any(word in text for word in ("hello", "hi", "hey", "হ্যালো", "হাই", "আসসালামু")):
-        return "Hello! আমি LISA। আজ কী নিয়ে কাজ করতে চাও?"
-    if any(word in text for word in ("তোমার নাম", "তোমার নাম কি", "who are you", "your name")):
+    if _has_any(text, ("hello", "hi", "hey", "হ্যালো", "হাই", "আসসালামু")):
+        return "Hello! আমি LISA। আজ কী নিয়ে কাজ করতে চাও?"
+    if _has_any(text, (), ("তোমার নাম", "who are you", "your name")):
         return "আমার নাম LISA। আমি RAFI-এর Python assistant project."
-    if any(word in text for word in ("কেমন আছ", "কেমন আছো", "how are you")):
+    if _has_any(text, (), ("কেমন আছ", "how are you")):
         return "আমি প্রস্তুত আছি! তুমি কীভাবে সাহায্য চাও?"
-    if any(word in text for word in ("ধন্যবাদ", "thanks", "thank you")):
+    if _has_any(text, ("ধন্যবাদ", "thanks"), ("thank you",)):
         return "স্বাগতম! / You're welcome."
-    return ("তোমার মেসেজটি পেয়েছি। এই সংস্করণে সাধারণ কথোপকথনের জন্য এখনো AI model নেই। "
-            "ওয়েবে খুঁজতে search <তোমার প্রশ্ন> লিখো।")
+    return ("তোমার মেসেজটি পেয়েছি। এই সংস্করণে সাধারণ কথোপকথনের জন্য এখনো AI model নেই। "
+            "ওয়েবে খুঁজতে search <তোমার প্রশ্ন> লিখো।")
 
 
 def show_recent_history(history: list[dict[str, str]], limit: int = 10) -> None:
@@ -98,11 +106,11 @@ def run_search(query: str) -> None:
     try:
         results = web_search(query)
         if not results:
-            print("LISA: কোনো ফলাফল পাওয়া যায়নি।")
+            print("LISA: কোনো ফলাফল পাওয়া যায়নি।")
             return
         for index, (title, url) in enumerate(results, start=1):
             print(f"\n{index}. {title}\n   {url}")
-        print("\nLISA: এগুলো বাইরের ওয়েবসাইটের ফলাফল। লিংক খোলার আগে যাচাই করো।")
+        print("\nLISA: এগুলো বাইরের ওয়েবসাইটের ফলাফল। লিংক খোলার আগে যাচাই করো।")
     except (URLError, TimeoutError, OSError, ValueError) as error:
         print(f"LISA: Search failed: {error}")
 
@@ -127,7 +135,7 @@ def main() -> None:
             show_help()
         elif command == "about":
             print("LISA V3: Python assistant with bilingual chat, local history and basic web search.")
-            print("এখনো AI model যুক্ত হয়নি।")
+            print("এখনো AI model যুক্ত হয়নি।")
         elif command == "time":
             print("LISA:", datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z"))
         elif command == "internet":
@@ -144,14 +152,10 @@ def main() -> None:
             print("\033[2J\033[H", end="")
             show_welcome()
         else:
-            history.append({"role": "user", "message": message,
-                            "time": datetime.now().astimezone().isoformat(timespec="seconds")})
+            save_message(history, "user", message)
             reply = make_reply(message)
             print("\nLISA >", reply)
-            history.append({"role": "lisa", "message": reply,
-                            "time": datetime.now().astimezone().isoformat(timespec="seconds")})
-            DATA_DIR.mkdir(parents=True, exist_ok=True)
-            HISTORY_FILE.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
+            save_message(history, "lisa", reply)
 
 
 if __name__ == "__main__":
