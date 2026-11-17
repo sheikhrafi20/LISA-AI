@@ -1,8 +1,6 @@
-"""LISA V2 — bilingual local chat interface.
+"""LISA V3 — bilingual assistant with basic internet utilities.
 
 Run from the project root with: python -m src.main
-
-This version is a local rule-based interface, not an online AI model yet.
 """
 
 from __future__ import annotations
@@ -10,6 +8,9 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
+from urllib.error import URLError
+
+from src.network import check_internet, web_search
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
@@ -17,7 +18,6 @@ HISTORY_FILE = DATA_DIR / "chat_history.json"
 
 
 def load_history() -> list[dict[str, str]]:
-    """Load this device's chat history, if it exists."""
     try:
         if HISTORY_FILE.exists():
             data = json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
@@ -35,111 +35,123 @@ def save_message(history: list[dict[str, str]], role: str, message: str) -> None
         "time": datetime.now().astimezone().isoformat(timespec="seconds"),
     })
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    HISTORY_FILE.write_text(
-        json.dumps(history, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    HISTORY_FILE.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def show_welcome() -> None:
     print("\n" + "═" * 54)
-    print("  LISA V2  |  PERSONAL AI ASSISTANT")
-    print("  Built by RAFI • বাংলা + English")
+    print("  LISA V3  |  PERSONAL ASSISTANT")
+    print("  Built by RAFI • বাংলা + English • Internet tools")
     print("═" * 54)
     print("  আমি LISA. কীভাবে সাহায্য করতে পারি?")
-    print("  I am LISA. How can I help?")
-    print("  Type help for commands • সাহায্যের জন্য help লিখুন")
-    print("  Note: This version works locally; AI model is not connected.")
+    print("  Commands: help | internet | search <query> | history | exit")
+    print("  Note: Search results are links, not AI-generated answers.")
     print("═" * 54)
 
 
 def show_help() -> None:
     print("""
 Commands / কমান্ড:
-  help      - Show commands / সাহায্য
-  about     - About LISA / LISA সম্পর্কে
-  time      - Show local time / সময় দেখাও
-  history   - Show recent chat / আগের কথোপকথন
-  clear     - Clear terminal / স্ক্রিন পরিষ্কার
-  exit      - Close LISA / বন্ধ করো
+  help             - Show commands
+  about            - About LISA
+  time             - Show local time
+  internet         - Check internet connection
+  search <query>   - Search the public web
+  history          - Show recent local chat history
+  clear            - Clear terminal
+  exit             - Close LISA
 
-You can also write simple messages in Bangla or English.
-তুমি বাংলায় বা ইংরেজিতে সাধারণ মেসেজ লিখতে পারো।
+বাংলা বা English-এ সাধারণ মেসেজও লিখতে পারো।
+এই সংস্করণে এখনো AI model যুক্ত হয়নি।
 """)
 
 
 def make_reply(message: str) -> str:
-    """Small bilingual starter responses; no claim of AI understanding."""
-    text = message.strip().lower()
-
+    text = message.strip().casefold()
     if any(word in text for word in ("hello", "hi", "hey", "হ্যালো", "হাই", "আসসালামু")):
-        return "Hello! আমি LISA। আজ কী নিয়ে কাজ করতে চাও? / What would you like to work on?"
+        return "Hello! আমি LISA। আজ কী নিয়ে কাজ করতে চাও?"
     if any(word in text for word in ("তোমার নাম", "তোমার নাম কি", "who are you", "your name")):
         return "আমার নাম LISA। আমি RAFI-এর Python assistant project."
     if any(word in text for word in ("কেমন আছ", "কেমন আছো", "how are you")):
-        return "আমি প্রস্তুত আছি! তুমি কীভাবে সাহায্য চাও? / I'm ready to help."
+        return "আমি প্রস্তুত আছি! তুমি কীভাবে সাহায্য চাও?"
     if any(word in text for word in ("ধন্যবাদ", "thanks", "thank you")):
         return "স্বাগতম! / You're welcome."
-    if any(word in text for word in ("কি করতে পারো", "কী করতে পারো", "what can you do")):
-        return "এখন আমি basic chat, help, time ও local chat history দিতে পারি। প্রকৃত AI response এখনো যুক্ত হয়নি."
-    return (
-        "তোমার মেসেজটি পেয়েছি। তবে এই সংস্করণে এখনো AI model সংযুক্ত নেই, "
-        "তাই জটিল প্রশ্নের উত্তর দিতে পারছি না। / Message received. "
-        "An AI model is not connected yet."
-    )
+    return ("তোমার মেসেজটি পেয়েছি। এই সংস্করণে সাধারণ কথোপকথনের জন্য এখনো AI model নেই। "
+            "ওয়েবে খুঁজতে search <তোমার প্রশ্ন> লিখো।")
 
 
 def show_recent_history(history: list[dict[str, str]], limit: int = 10) -> None:
     if not history:
-        print("LISA: এখনো কোনো chat history নেই। / No chat history yet.")
+        print("LISA: এখনো কোনো chat history নেই।")
         return
-    print("\n--- Recent chat / সাম্প্রতিক কথোপকথন ---")
+    print("\n--- Recent chat ---")
     for item in history[-limit:]:
         role = "You" if item.get("role") == "user" else "LISA"
         print(f"{role}: {item.get('message', '')}")
 
 
+def run_search(query: str) -> None:
+    if not query.strip():
+        print("Usage: search <your question>")
+        return
+    print("\nLISA: Searching the public web...")
+    try:
+        results = web_search(query)
+        if not results:
+            print("LISA: কোনো ফলাফল পাওয়া যায়নি।")
+            return
+        for index, (title, url) in enumerate(results, start=1):
+            print(f"\n{index}. {title}\n   {url}")
+        print("\nLISA: এগুলো বাইরের ওয়েবসাইটের ফলাফল। লিংক খোলার আগে যাচাই করো।")
+    except (URLError, TimeoutError, OSError, ValueError) as error:
+        print(f"LISA: Search failed: {error}")
+
+
 def main() -> None:
     history = load_history()
     show_welcome()
-
     while True:
         try:
             message = input("\nRAFI > ").strip()
         except (EOFError, KeyboardInterrupt):
-            print("\nLISA: Session closed. / সেশন বন্ধ হয়েছে।")
+            print("\nLISA: Session closed.")
             break
-
         if not message:
             continue
 
         command = message.casefold()
-
         if command in {"exit", "quit", "বন্ধ", "বের হও"}:
-            print("LISA: Goodbye, RAFI. / বিদায়!")
+            print("LISA: Goodbye, RAFI.")
             break
         if command == "help":
             show_help()
-            continue
-        if command == "about":
-            print("\nLISA is a Python-based personal assistant project by RAFI.")
-            print("এই সংস্করণে bilingual terminal chat ও local history আছে; online AI এখনো যুক্ত হয়নি।")
-            continue
-        if command == "time":
+        elif command == "about":
+            print("LISA V3: Python assistant with bilingual chat, local history and basic web search.")
+            print("এখনো AI model যুক্ত হয়নি।")
+        elif command == "time":
             print("LISA:", datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z"))
-            continue
-        if command == "history":
+        elif command == "internet":
+            print("LISA: Checking internet...")
+            connected, detail = check_internet()
+            print(("ONLINE ✓ " if connected else "OFFLINE ✗ ") + detail)
+        elif command.startswith("search "):
+            run_search(message[7:].strip())
+        elif command == "search":
+            run_search("")
+        elif command == "history":
             show_recent_history(history)
-            continue
-        if command == "clear":
+        elif command == "clear":
             print("\033[2J\033[H", end="")
             show_welcome()
-            continue
-
-        save_message(history, "user", message)
-        reply = make_reply(message)
-        print("\nLISA >", reply)
-        save_message(history, "lisa", reply)
+        else:
+            history.append({"role": "user", "message": message,
+                            "time": datetime.now().astimezone().isoformat(timespec="seconds")})
+            reply = make_reply(message)
+            print("\nLISA >", reply)
+            history.append({"role": "lisa", "message": reply,
+                            "time": datetime.now().astimezone().isoformat(timespec="seconds")})
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            HISTORY_FILE.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 if __name__ == "__main__":
