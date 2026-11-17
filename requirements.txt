@@ -1,0 +1,2 @@
+# LISA currently uses only Python standard-library modules.
+# Add third-party packages here when new features require them.
