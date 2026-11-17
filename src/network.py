@@ -96,18 +96,21 @@ def web_search(query: str, timeout: float = 12.0, limit: int = 5) -> list[tuple[
     if not cleaned_query:
         return []
 
+    errors: list[str] = []
     try:
         results = _bing_rss_search(cleaned_query, timeout, limit)
         if results:
             return results
-    except (URLError, TimeoutError, OSError, ElementTree.ParseError, ValueError):
-        pass
+        errors.append("Bing RSS: response contained no result items")
+    except Exception as error:
+        errors.append(f"Bing RSS: {type(error).__name__}: {error}")
 
     try:
         results = _duckduckgo_html_search(cleaned_query, timeout, limit)
         if results:
             return results
-    except (URLError, TimeoutError, OSError, ValueError):
-        pass
+        errors.append("DuckDuckGo HTML: response contained no result links")
+    except Exception as error:
+        errors.append(f"DuckDuckGo HTML: {type(error).__name__}: {error}")
 
-    raise ValueError("Both search providers returned no readable results. Check network access or try another query.")
+    raise ValueError(" | ".join(errors))
