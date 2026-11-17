@@ -6,6 +6,8 @@
 
 [![Python](https://img.shields.io/badge/Python-3.x-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![Status](https://img.shields.io/badge/Status-In%20Development-8B5CF6?style=for-the-badge)](#-project-status)
+[![Tests](https://img.shields.io/badge/Tests-pytest-0A9EDC?style=for-the-badge&logo=pytest&logoColor=white)](#-running-tests)
+[![License](https://img.shields.io/badge/License-MIT-22C55E?style=for-the-badge)](LICENSE)
 [![Made by RAFI](https://img.shields.io/badge/Made%20by-RAFI-EC4899?style=for-the-badge)](https://github.com/sheikhrafi20)
 
 </div>
@@ -29,15 +31,39 @@ The current version (**V3**) is a command-line assistant that understands simple
 
 > ⚠️ This version does **not** include an AI language model yet. Replies are rule-based.
 
+## 🖥️ Demo
+
+```text
+══════════════════════════════════════════════════════
+  LISA V3  |  PERSONAL ASSISTANT
+  Built by RAFI • বাংলা + English • Internet tools
+══════════════════════════════════════════════════════
+  আমি LISA. কীভাবে সাহায্য করতে পারি?
+  Commands: help | internet | search <query> | history | exit
+  Note: Search results are links, not AI-generated answers.
+══════════════════════════════════════════════════════
+
+RAFI > hello
+
+LISA > Hello! আমি LISA। আজ কী নিয়ে কাজ করতে চাও?
+
+RAFI > time
+LISA: 2026-11-17 21:56:09 UTC
+
+RAFI > exit
+LISA: Goodbye, RAFI.
+```
+
 ## ⚡ Quick start
 
 ```bash
 git clone https://github.com/sheikhrafi20/LISA-AI.git
 cd LISA-AI
+python -m pip install -r requirements.txt
 python -m src.main
 ```
 
-Run it from the project root. If `requirements.txt` lists any packages, install them first with `pip install -r requirements.txt`.
+Run it from the project root.
 
 ## 💬 Commands
 
@@ -52,11 +78,22 @@ Run it from the project root. If `requirements.txt` lists any packages, install 
 | `clear` | Clear the terminal |
 | `exit` | Close LISA |
 
+## 🧪 Running tests
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m pytest
+```
+
+Tests cover reply matching, chat history saving/loading, and the web search and internet check (using fake network responses, so they run offline).
+
 ## 🧰 Technology
 
 | Technology | Purpose |
 |---|---|
 | Python | Main programming language |
+| certifi | Secure HTTPS certificates |
+| pytest | Automated tests |
 | Git & GitHub | Version control and project hosting |
 
 ## 📁 Project structure
@@ -66,11 +103,16 @@ LISA-AI/
 ├── assets/
 │   └── lisa-banner.svg
 ├── src/
-│   ├── main.py        # CLI, commands and chat loop
-│   └── network.py     # Internet check and web search
+│   ├── main.py            # CLI, commands and chat loop
+│   └── network.py         # Internet check and web search
+├── tests/
+│   ├── test_main.py
+│   └── test_network.py
 ├── .gitignore
+├── LICENSE
 ├── README.md
-└── requirements.txt
+├── requirements.txt
+└── requirements-dev.txt
 ```
 
 ## 🎯 Project goals
@@ -87,7 +129,7 @@ Chat history is stored locally in `data/chat_history.json`, which is excluded fr
 
 ## 🚧 Project status
 
-LISA is in **active early development**. Planned next steps include adding an AI model, improving conversation, and adding tests.
+LISA is in **active early development**. See the [open issues](https://github.com/sheikhrafi20/LISA-AI/issues) for the roadmap.
 
 ## 👨‍💻 Developer
 
