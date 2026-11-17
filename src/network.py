@@ -1,11 +1,20 @@
-"""Small standard-library network utilities for LISA."""
+"""Secure HTTPS utilities for LISA.
+
+TLS certificate verification stays enabled. Install dependencies with:
+    python -m pip install -r requirements.txt
+"""
 
 from __future__ import annotations
 
+import ssl
 from html.parser import HTMLParser
 from urllib.error import URLError
 from urllib.parse import quote_plus
 from urllib.request import Request, urlopen
+
+import certifi
+
+SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
 
 
 class SearchResultParser(HTMLParser):
@@ -20,7 +29,8 @@ class SearchResultParser(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         attributes = dict(attrs)
-        if tag == "a" and "result__a" in (attributes.get("class") or ""):
+        classes = (attributes.get("class") or "").split()
+        if tag == "a" and "result__a" in classes:
             self._capture = True
             self._title_parts = []
             self._href = attributes.get("href") or ""
@@ -37,32 +47,32 @@ class SearchResultParser(HTMLParser):
             self._capture = False
 
 
-def check_internet(timeout: float = 5.0) -> tuple[bool, str]:
-    """Check HTTPS connectivity using a small request."""
+def check_internet(timeout: float = 8.0) -> tuple[bool, str]:
+    """Check HTTPS connectivity with certificate verification enabled."""
     request = Request(
         "https://example.com/",
-        headers={"User-Agent": "LISA-Personal-Assistant/0.1"},
+        headers={"User-Agent": "LISA-Personal-Assistant/0.2"},
     )
     try:
-        with urlopen(request, timeout=timeout) as response:
+        with urlopen(request, timeout=timeout, context=SSL_CONTEXT) as response:
             if 200 <= response.status < 400:
-                return True, f"Connected (HTTP {response.status})"
+                return True, f"Connected securely (HTTP {response.status})"
             return False, f"Server returned HTTP {response.status}"
     except (URLError, TimeoutError, OSError) as error:
-        return False, f"Connection unavailable: {error}"
+        return False, f"HTTPS connection failed: {error}"
 
 
-def web_search(query: str, timeout: float = 10.0, limit: int = 5) -> list[tuple[str, str]]:
-    """Fetch public search-result links. Results are untrusted external content."""
+def web_search(query: str, timeout: float = 12.0, limit: int = 5) -> list[tuple[str, str]]:
+    """Fetch public search-result links; external content is untrusted."""
     if not query.strip():
         return []
 
     url = "https://html.duckduckgo.com/html/?q=" + quote_plus(query.strip())
     request = Request(
         url,
-        headers={"User-Agent": "Mozilla/5.0 (compatible; LISA/0.1)"},
+        headers={"User-Agent": "Mozilla/5.0 (compatible; LISA/0.2)"},
     )
-    with urlopen(request, timeout=timeout) as response:
+    with urlopen(request, timeout=timeout, context=SSL_CONTEXT) as response:
         html = response.read(1_500_000).decode("utf-8", errors="replace")
 
     parser = SearchResultParser()
