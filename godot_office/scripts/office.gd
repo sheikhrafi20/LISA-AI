@@ -18,6 +18,8 @@ var progress_label: Label
 var task_input: LineEdit
 var report_box: RichTextLabel
 var courier: Node3D
+var courier_document: MeshInstance3D
+var final_report_shown := false
 var courier_tween: Tween
 var staff_nodes: Array[Node3D] = []
 var boss: Node3D
@@ -220,7 +222,7 @@ func _build_office() -> void:
 
     # Messenger station and visible work-order sheet.
     courier = _build_person(self, "MESSENGER", Vector3(-6.5, 0, 2.0), Color(0.42, 0.27, 0.16))
-    _box(courier, "Work order document", Vector3(0.42, 1.10, 0.16), Vector3(0.24, 0.34, 0.035), Color(0.94, 0.91, 0.78))
+    courier_document = _box(courier, "Work order document", Vector3(0.42, 1.10, 0.16), Vector3(0.24, 0.34, 0.035), Color(0.94, 0.91, 0.78))
     _build_plant(self, Vector3(-7.4, 0, -5.0))
     _build_plant(self, Vector3(7.4, 0, -5.0))
     _build_plant(self, Vector3(7.4, 0, 4.8))
@@ -287,6 +289,8 @@ func _submit_task(value: String) -> void:
         status_label.text = "Could not contact LISA bridge. Start Python bridge first."
         return
     busy = true
+    final_report_shown = false
+    current_focus = ""
     seen_notes = 0
     task_input.clear()
     status_label.text = "Sending work order to LISA Boss..."
@@ -297,11 +301,16 @@ func _animate_courier() -> void:
     if courier_tween and courier_tween.is_running():
         courier_tween.kill()
     courier.position = Vector3(-6.5, 0, 2.0)
+    courier_document.position = Vector3(0.42, 1.10, 0.16)
+    courier_document.visible = true
     courier_tween = create_tween()
-    courier_tween.tween_property(courier, "position", Vector3(0, 0, 3.0), 1.8)
+    courier_tween.tween_property(courier, "position", Vector3(0, 0, 3.0), 1.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+    courier_tween.tween_interval(0.45)
     for member in STAFF:
-        courier_tween.tween_property(courier, "position", member.pos + Vector3(0, 0, 1.1), 1.25)
-    courier_tween.tween_property(courier, "position", Vector3(0, 0, 3.0), 1.8)
+        var destination: Vector3 = member.pos + Vector3(0, 0, 1.1)
+        courier_tween.tween_property(courier, "position", destination, 1.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+        courier_tween.tween_interval(0.35)
+    courier_tween.tween_property(courier, "position", Vector3(0, 0, 3.0), 1.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
 func _poll_status() -> void:
@@ -339,9 +348,11 @@ func _update_from_status(data: Dictionary) -> void:
         report_box.append_text("\n\n[b]" + str(note.get("role", "Staff")) + " report[/b]\n" + str(note.get("result", "")))
         seen_notes += 1
     if state == "completed":
-        report_box.append_text("\n\n[b]LISA BOSS — FINAL REPORT[/b]\n" + str(data.get("final", "")))
-        status_label.text = "LISA BOSS IS PRESENTING THE FINAL REPORT"
-        _focus_character(boss, true)
+        if not final_report_shown:
+            report_box.append_text("\n\n[b]LISA BOSS — FINAL REPORT[/b]\n" + str(data.get("final", "")))
+            final_report_shown = true
+            status_label.text = "LISA BOSS IS PRESENTING THE FINAL REPORT"
+            _focus_character(boss, true)
         busy = false
     elif state == "error":
         report_box.append_text("\n\n[ERROR] " + str(data.get("error", "Unknown error")))
