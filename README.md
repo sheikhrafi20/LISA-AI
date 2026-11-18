@@ -18,7 +18,7 @@
 
 **LISA** is a personal AI assistant project by **RAFI**, built with Python. It is developed gradually, starting with a clean foundation and adding useful assistant capabilities in small, testable stages.
 
-The current version (**V4**) is a command-line assistant that chats in **বাংলা + English**, can use a real **AI model** for replies, can **speak its replies aloud**, and has basic internet utilities.
+The current version (**V4**) includes the original command-line assistant and a new optional **Tkinter desktop chat window**. Both use the same AI/basic-reply engine and local chat history. The desktop interface prefers **Nirmala UI** for Bengali text; the CLI remains available.
 
 ## 🚀 Features (V4)
 
@@ -32,7 +32,7 @@ The current version (**V4**) is a command-line assistant that chats in **বা�
 - 💾 Local chat history, saved on your own computer only
 - 📜 `history` command to view recent messages
 
-## 🔑 Turning on AI
+## 🖥️ Desktop app (new)\n\nLaunch the purple desktop chat window from the project root:\n\n```bash\npython -m src.gui\n```\n\nThe app uses Tkinter (included with most standard Windows Python installations), prefers the **Nirmala UI** font for Bengali, keeps the interface responsive while the AI is generating a reply, and saves chat history locally in `data/chat_history.json`. The original terminal app is unchanged and remains available with `python -m src.main`.\n\nThe desktop app currently provides chat and a voice on/off toggle. Terminal-only utilities such as web search, internet check, and time remain in the CLI.\n\n## 🔑 Turning on AI
 
 AI is **off by default**. Choose one option.
 
