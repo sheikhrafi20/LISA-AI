@@ -67,3 +67,25 @@ def test_load_history_ignores_non_list_json(temp_history):
     temp_history.parent.mkdir(parents=True)
     temp_history.write_text(json.dumps({"a": 1}), encoding="utf-8")
     assert main.load_history() == []
+
+
+def test_get_reply_uses_ai_when_available(monkeypatch):
+    monkeypatch.setattr(main, "ai_available", lambda: True)
+    monkeypatch.setattr(main, "generate_reply", lambda history: "AI says hi")
+    assert main.get_reply([{"role": "user", "message": "x"}], "x") == "AI says hi"
+
+
+def test_get_reply_falls_back_when_ai_fails(monkeypatch, capsys):
+    def broken(history):
+        raise main.AIError("boom")
+
+    monkeypatch.setattr(main, "ai_available", lambda: True)
+    monkeypatch.setattr(main, "generate_reply", broken)
+    reply = main.get_reply([{"role": "user", "message": "hello"}], "hello")
+    assert reply.startswith("Hello!")
+    assert "boom" in capsys.readouterr().out
+
+
+def test_get_reply_uses_basic_replies_without_key(monkeypatch):
+    monkeypatch.setattr(main, "ai_available", lambda: False)
+    assert main.get_reply([], "hello").startswith("Hello!")

@@ -1,4 +1,4 @@
-"""LISA V3 — bilingual assistant with basic internet utilities.
+"""LISA V4 — bilingual AI assistant with basic internet utilities.
 
 Run from the project root with: python -m src.main
 """
@@ -10,11 +10,14 @@ from datetime import datetime
 from pathlib import Path
 from urllib.error import URLError
 
+from src.ai import AIError, ai_available, generate_reply, get_model
+from src.config import load_dotenv
 from src.network import check_internet, web_search
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 HISTORY_FILE = DATA_DIR / "chat_history.json"
+ENV_FILE = PROJECT_ROOT / ".env"
 PUNCTUATION = ".,!?;:()\"'।"
 
 
@@ -42,7 +45,7 @@ def save_message(history: list[dict[str, str]], role: str, message: str) -> None
 
 def show_welcome() -> None:
     print("\n" + "═" * 54)
-    print("  LISA V3  |  PERSONAL ASSISTANT")
+    print("  LISA V4  |  PERSONAL ASSISTANT")
     print("  Built by RAFI • বাংলা + English • Internet tools")
     print("═" * 54)
     print("  আমি LISA. কীভাবে সাহায্য করতে পারি?")
@@ -64,7 +67,7 @@ Commands / কমান্ড:
   exit             - Close LISA
 
 বাংলা বা English-এ সাধারণ মেসেজও লিখতে পারো।
-এই সংস্করণে এখনো AI model যুক্ত হয়নি।
+AI চালু করতে .env ফাইলে ANTHROPIC_API_KEY দাও (README দেখো)।
 """)
 
 
@@ -84,8 +87,19 @@ def make_reply(message: str) -> str:
         return "আমি প্রস্তুত আছি! তুমি কীভাবে সাহায্য চাও?"
     if _has_any(text, ("ধন্যবাদ", "thanks"), ("thank you",)):
         return "স্বাগতম! / You're welcome."
-    return ("তোমার মেসেজটি পেয়েছি। এই সংস্করণে সাধারণ কথোপকথনের জন্য এখনো AI model নেই। "
-            "ওয়েবে খুঁজতে search <তোমার প্রশ্ন> লিখো।")
+    return ("তোমার মেসেজটি পেয়েছি। AI চালু নেই, তাই আমি শুধু সাধারণ কিছু কথা বুঝি। "
+            "AI চালু করতে .env ফাইলে ANTHROPIC_API_KEY দাও, অথবা ওয়েবে খুঁজতে "
+            "search <তোমার প্রশ্ন> লিখো।")
+
+
+def get_reply(history: list[dict[str, str]], message: str) -> str:
+    """Use the AI model when a key is set; otherwise (or on error) use basic replies."""
+    if ai_available():
+        try:
+            return generate_reply(history)
+        except AIError as error:
+            print(f"LISA: AI is not available right now ({error}). Using basic replies.")
+    return make_reply(message)
 
 
 def show_recent_history(history: list[dict[str, str]], limit: int = 10) -> None:
@@ -116,6 +130,7 @@ def run_search(query: str) -> None:
 
 
 def main() -> None:
+    load_dotenv(ENV_FILE)
     history = load_history()
     show_welcome()
     while True:
@@ -134,8 +149,11 @@ def main() -> None:
         if command == "help":
             show_help()
         elif command == "about":
-            print("LISA V3: Python assistant with bilingual chat, local history and basic web search.")
-            print("এখনো AI model যুক্ত হয়নি।")
+            print("LISA V4: Python assistant with bilingual chat, local history, web search and AI replies.")
+            if ai_available():
+                print(f"AI: ON (model: {get_model()})")
+            else:
+                print("AI: OFF — add ANTHROPIC_API_KEY to the .env file to turn it on.")
         elif command == "time":
             print("LISA:", datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z"))
         elif command == "internet":
@@ -153,7 +171,7 @@ def main() -> None:
             show_welcome()
         else:
             save_message(history, "user", message)
-            reply = make_reply(message)
+            reply = get_reply(history, message)
             print("\nLISA >", reply)
             save_message(history, "lisa", reply)
 
