@@ -43,10 +43,10 @@ def run_task(task_id: str, task: str) -> None:
             with _lock:
                 _state.update(state="working", current_role=name, completed=index - 1)
             prompt = (
-                f"[LISA OFFICE STAFF: {name}]\\n{instruction}\\n"
+                f"[LISA OFFICE STAFF: {name}]\n{instruction}\n"
                 "Work only on the user's task. Be concrete. State uncertainty; "
-                "do not claim external verification or actions you did not perform.\\n"
-                f"USER TASK:\\n{task}"
+                "do not claim external verification or actions you did not perform.\n"
+                f"USER TASK:\n{task}"
             )
             result = get_reply([*context, {"role": "user", "message": prompt}], prompt)
             notes.append({"role": name, "result": result})
@@ -54,13 +54,13 @@ def run_task(task_id: str, task: str) -> None:
                 _state.update(completed=index, notes=notes)
         with _lock:
             _state.update(state="coordinating", current_role="LISA Boss")
-        summary = "\\n\\n".join(f"{n['role']}:\\n{n['result']}" for n in notes)
+        summary = "\n\n".join(f"{n['role']}:\n{n['result']}" for n in notes)
         coordinator_prompt = (
-            "[LISA OFFICE — BOSS / COORDINATOR]\\n"
+            "[LISA OFFICE — BOSS / COORDINATOR]\n"
             "Synthesize the five staff reports. Resolve conflicts, distinguish "
             "verified facts from assumptions, and give the user a detailed useful result. "
-            "Do not claim the staff are independent model providers.\\n"
-            f"USER TASK:\\n{task}\\n\\nSTAFF REPORTS:\\n{summary}"
+            "Do not claim the staff are independent model providers.\n"
+            f"USER TASK:\n{task}\n\nSTAFF REPORTS:\n{summary}"
         )
         final = get_reply([*context, {"role": "user", "message": coordinator_prompt}], coordinator_prompt)
         with _lock:
@@ -136,7 +136,7 @@ def main() -> None:
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\\nLISA Office Bridge stopped.")
+        print("\nLISA Office Bridge stopped.")
     finally:
         server.server_close()
 
