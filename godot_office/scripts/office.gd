@@ -2,18 +2,17 @@ extends Node3D
 
 const API := "http://127.0.0.1:8765"
 const STAFF := [
-    {"name": "RESEARCHER", "title": "Research & Facts", "pos": Vector3(-5.0, 0, -2.0)},
-    {"name": "PLANNER", "title": "Planning & Tasks", "pos": Vector3(-2.5, 0, -2.0)},
-    {"name": "ANALYST", "title": "Analysis", "pos": Vector3(0.0, 0, -2.0)},
-    {"name": "CRITIC", "title": "Quality & Risks", "pos": Vector3(2.5, 0, -2.0)},
-    {"name": "WRITER", "title": "Reports & Output", "pos": Vector3(5.0, 0, -2.0)}
+    {"name": "RESEARCHER", "title": "Research & Facts", "pos": Vector3(-5.0, 0, -2.0), "outfit": Color(0.20, 0.34, 0.58)},
+    {"name": "PLANNER", "title": "Planning & Tasks", "pos": Vector3(-2.5, 0, -2.0), "outfit": Color(0.22, 0.43, 0.48)},
+    {"name": "ANALYST", "title": "Analysis", "pos": Vector3(0.0, 0, -2.0), "outfit": Color(0.40, 0.31, 0.58)},
+    {"name": "CRITIC", "title": "Quality & Risks", "pos": Vector3(2.5, 0, -2.0), "outfit": Color(0.52, 0.31, 0.27)},
+    {"name": "WRITER", "title": "Reports & Output", "pos": Vector3(5.0, 0, -2.0), "outfit": Color(0.24, 0.43, 0.31)}
 ]
 
 var http: HTTPRequest
 var poll: Timer
 var busy := false
 var seen_notes := 0
-var last_state := ""
 var status_label: Label
 var progress_label: Label
 var task_input: LineEdit
@@ -46,13 +45,54 @@ func _material(color: Color, metallic := 0.0, roughness := 0.7) -> StandardMater
     return m
 
 
-func _box(parent: Node3D, label: String, pos: Vector3, size: Vector3, color: Color) -> MeshInstance3D:
+func _box(parent: Node3D, label: String, pos: Vector3, size: Vector3, color: Color, metallic := 0.0, roughness := 0.7) -> MeshInstance3D:
     var mesh := BoxMesh.new()
     mesh.size = size
     var node := MeshInstance3D.new()
     node.name = label
     node.mesh = mesh
     node.position = pos
+    node.material_override = _material(color, metallic, roughness)
+    parent.add_child(node)
+    return node
+
+
+func _sphere(parent: Node3D, label: String, pos: Vector3, radius: float, color: Color) -> MeshInstance3D:
+    var mesh := SphereMesh.new()
+    mesh.radius = radius
+    mesh.height = radius * 2.0
+    var node := MeshInstance3D.new()
+    node.name = label
+    node.mesh = mesh
+    node.position = pos
+    node.material_override = _material(color)
+    parent.add_child(node)
+    return node
+
+
+func _cylinder(parent: Node3D, label: String, pos: Vector3, radius: float, height: float, color: Color) -> MeshInstance3D:
+    var mesh := CylinderMesh.new()
+    mesh.top_radius = radius
+    mesh.bottom_radius = radius
+    mesh.height = height
+    var node := MeshInstance3D.new()
+    node.name = label
+    node.mesh = mesh
+    node.position = pos
+    node.material_override = _material(color)
+    parent.add_child(node)
+    return node
+
+
+func _capsule_part(parent: Node3D, label: String, pos: Vector3, radius: float, height: float, color: Color, tilt := 0.0) -> MeshInstance3D:
+    var mesh := CapsuleMesh.new()
+    mesh.radius = radius
+    mesh.height = height
+    var node := MeshInstance3D.new()
+    node.name = label
+    node.mesh = mesh
+    node.position = pos
+    node.rotation.z = tilt
     node.material_override = _material(color)
     parent.add_child(node)
     return node
@@ -63,68 +103,104 @@ func _build_person(parent: Node3D, label: String, pos: Vector3, outfit: Color) -
     person.name = label
     person.position = pos
     parent.add_child(person)
-    var body := MeshInstance3D.new()
-    var capsule := CapsuleMesh.new()
-    capsule.radius = 0.32
-    capsule.height = 1.25
-    body.mesh = capsule
-    body.position.y = 0.85
-    body.material_override = _material(outfit)
-    person.add_child(body)
-    var head := MeshInstance3D.new()
-    var sphere := SphereMesh.new()
-    sphere.radius = 0.24
-    sphere.height = 0.48
-    head.mesh = sphere
-    head.position.y = 1.62
-    head.material_override = _material(Color(0.78, 0.57, 0.43))
-    person.add_child(head)
+
+    # Lightweight stylized humanoid assembled from primitives; rigged models come later.
+    _capsule_part(person, "Torso", Vector3(0, 1.02, 0), 0.27, 0.82, outfit)
+    _sphere(person, "Neck", Vector3(0, 1.48, 0), 0.10, Color(0.66, 0.45, 0.34))
+    _sphere(person, "Head", Vector3(0, 1.72, 0), 0.25, Color(0.72, 0.52, 0.40))
+    _sphere(person, "Hair", Vector3(0, 1.88, -0.035), 0.225, Color(0.12, 0.085, 0.07))
+    _capsule_part(person, "Left arm", Vector3(-0.34, 1.03, 0.015), 0.085, 0.62, outfit, -0.18)
+    _capsule_part(person, "Right arm", Vector3(0.34, 1.03, 0.015), 0.085, 0.62, outfit, 0.18)
+    _sphere(person, "Left hand", Vector3(-0.39, 0.70, 0.04), 0.085, Color(0.72, 0.52, 0.40))
+    _sphere(person, "Right hand", Vector3(0.39, 0.70, 0.04), 0.085, Color(0.72, 0.52, 0.40))
+    _capsule_part(person, "Left leg", Vector3(-0.13, 0.34, 0), 0.105, 0.58, Color(0.075, 0.09, 0.14))
+    _capsule_part(person, "Right leg", Vector3(0.13, 0.34, 0), 0.105, 0.58, Color(0.075, 0.09, 0.14))
+    _box(person, "Left shoe", Vector3(-0.13, 0.055, 0.08), Vector3(0.20, 0.10, 0.34), Color(0.035, 0.035, 0.045))
+    _box(person, "Right shoe", Vector3(0.13, 0.055, 0.08), Vector3(0.20, 0.10, 0.34), Color(0.035, 0.035, 0.045))
+    _sphere(person, "Left eye", Vector3(-0.085, 1.75, 0.215), 0.025, Color(0.025, 0.02, 0.02))
+    _sphere(person, "Right eye", Vector3(0.085, 1.75, 0.215), 0.025, Color(0.025, 0.02, 0.02))
     return person
+
+
+func _build_desk(parent: Node3D, label: String, pos: Vector3, width := 1.65) -> void:
+    _box(parent, label + " desktop", pos + Vector3(0, 0.86, 0), Vector3(width, 0.12, 0.82), Color(0.25, 0.17, 0.12), 0.05, 0.38)
+    for x in [-width * 0.40, width * 0.40]:
+        for z in [-0.27, 0.27]:
+            _box(parent, label + " leg", pos + Vector3(x, 0.42, z), Vector3(0.075, 0.82, 0.075), Color(0.12, 0.13, 0.16), 0.55)
+    _box(parent, label + " monitor frame", pos + Vector3(0, 1.34, -0.22), Vector3(0.78, 0.48, 0.075), Color(0.035, 0.045, 0.065), 0.35)
+    _box(parent, label + " monitor screen", pos + Vector3(0, 1.34, -0.176), Vector3(0.69, 0.39, 0.012), Color(0.08, 0.34, 0.48), 0.1, 0.25)
+    _box(parent, label + " keyboard", pos + Vector3(0, 0.94, 0.22), Vector3(0.52, 0.035, 0.16), Color(0.055, 0.06, 0.075))
+    _box(parent, label + " chair seat", pos + Vector3(0, 0.48, 0.88), Vector3(0.62, 0.12, 0.58), Color(0.12, 0.14, 0.20))
+    _box(parent, label + " chair back", pos + Vector3(0, 0.91, 1.13), Vector3(0.62, 0.78, 0.12), Color(0.12, 0.14, 0.20))
+
+
+func _build_plant(parent: Node3D, pos: Vector3) -> void:
+    _cylinder(parent, "Plant pot", pos + Vector3(0, 0.28, 0), 0.28, 0.48, Color(0.20, 0.16, 0.15))
+    _cylinder(parent, "Plant stem", pos + Vector3(0, 0.85, 0), 0.045, 0.78, Color(0.12, 0.25, 0.15))
+    for i in range(6):
+        var angle := TAU * float(i) / 6.0
+        _sphere(parent, "Plant leaf", pos + Vector3(cos(angle) * 0.28, 0.92 + float(i % 2) * 0.18, sin(angle) * 0.22), 0.19, Color(0.12, 0.34, 0.22))
 
 
 func _build_office() -> void:
     var world := WorldEnvironment.new()
     var env := Environment.new()
     env.background_mode = Environment.BG_COLOR
-    env.background_color = Color(0.035, 0.045, 0.075)
+    env.background_color = Color(0.025, 0.035, 0.06)
     env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-    env.ambient_light_color = Color(0.58, 0.62, 0.82)
-    env.ambient_light_energy = 0.65
+    env.ambient_light_color = Color(0.62, 0.66, 0.82)
+    env.ambient_light_energy = 0.72
     world.environment = env
     add_child(world)
 
-    var floor := _box(self, "Polished office floor", Vector3(0, -0.12, 0), Vector3(17, 0.24, 12), Color(0.12, 0.13, 0.19))
-    floor.material_override = _material(Color(0.12, 0.13, 0.19), 0.22, 0.28)
-    _box(self, "Back wall", Vector3(0, 2.1, -6), Vector3(17, 4.2, 0.2), Color(0.09, 0.10, 0.16))
-    _box(self, "Left wall", Vector3(-8.5, 2.1, 0), Vector3(0.2, 4.2, 12), Color(0.08, 0.09, 0.14))
-    _box(self, "Right wall", Vector3(8.5, 2.1, 0), Vector3(0.2, 4.2, 12), Color(0.08, 0.09, 0.14))
+    # Main floor, architectural shell and ceiling.
+    _box(self, "Main polished floor", Vector3(0, -0.12, 0), Vector3(17, 0.24, 12), Color(0.105, 0.12, 0.17), 0.28, 0.24)
+    _box(self, "Back wall", Vector3(0, 2.1, -6), Vector3(17, 4.2, 0.2), Color(0.075, 0.09, 0.14))
+    _box(self, "Left wall", Vector3(-8.5, 2.1, 0), Vector3(0.2, 4.2, 12), Color(0.07, 0.08, 0.13))
+    _box(self, "Right wall", Vector3(8.5, 2.1, 0), Vector3(0.2, 4.2, 12), Color(0.07, 0.08, 0.13))
+    _box(self, "Ceiling", Vector3(0, 4.25, 0), Vector3(17, 0.16, 12), Color(0.055, 0.065, 0.10))
+    _box(self, "Ceiling light strip", Vector3(0, 4.14, -1.0), Vector3(10, 0.035, 0.16), Color(0.66, 0.76, 1.0), 0.0, 0.25)
+
+    # Back-wall windows with slim frames.
+    for x in [-5.8, -2.0, 2.0, 5.8]:
+        _box(self, "Blue tinted window", Vector3(x, 2.45, -5.87), Vector3(2.65, 2.25, 0.045), Color(0.10, 0.23, 0.34), 0.25, 0.18)
+        _box(self, "Window mullion", Vector3(x, 2.45, -5.82), Vector3(0.045, 2.25, 0.05), Color(0.34, 0.40, 0.52), 0.5)
+    _box(self, "Reception feature wall", Vector3(0, 2.3, -5.72), Vector3(3.2, 1.25, 0.08), Color(0.12, 0.15, 0.24))
+    _box(self, "LISA wall sign", Vector3(0, 2.42, -5.65), Vector3(1.9, 0.34, 0.035), Color(0.20, 0.42, 0.72), 0.1)
 
     var key := DirectionalLight3D.new()
     key.rotation_degrees = Vector3(-48, -25, 0)
-    key.light_energy = 1.15
+    key.light_energy = 1.05
     key.shadow_enabled = true
     add_child(key)
 
-    # Executive office: glass-like divider and boss desk.
-    _box(self, "Executive divider", Vector3(0, 1.55, 3.4), Vector3(7.2, 3.1, 0.12), Color(0.12, 0.18, 0.27, 0.72))
-    _box(self, "Boss desk", Vector3(0, 0.55, 4.2), Vector3(3.2, 0.18, 1.1), Color(0.24, 0.16, 0.12))
-    boss = _build_person(self, "LISA BOSS", Vector3(0, 0, 3.25), Color(0.28, 0.22, 0.48))
-    _label_3d(boss, "LISA  •  BOSS", Vector3(0, 2.05, 0))
+    # Executive suite is separated from the staff floor by glass partitions.
+    _box(self, "Executive rear glass", Vector3(0, 1.65, 2.05), Vector3(7.8, 3.3, 0.10), Color(0.10, 0.20, 0.31, 0.58), 0.15, 0.2)
+    _box(self, "Executive left glass", Vector3(-3.9, 1.65, 3.55), Vector3(0.10, 3.3, 3.0), Color(0.10, 0.20, 0.31, 0.48), 0.15, 0.2)
+    _box(self, "Executive right glass", Vector3(3.9, 1.65, 3.55), Vector3(0.10, 3.3, 3.0), Color(0.10, 0.20, 0.31, 0.48), 0.15, 0.2)
+    _box(self, "Executive rug", Vector3(0, 0.015, 3.55), Vector3(7.4, 0.035, 3.0), Color(0.12, 0.13, 0.22))
+    _build_desk(self, "LISA executive", Vector3(0, 0, 4.1), 3.0)
+    boss = _build_person(self, "LISA BOSS", Vector3(0, 0, 3.0), Color(0.28, 0.22, 0.48))
+    _label_3d(boss, "LISA  •  BOSS", Vector3(0, 2.25, 0))
 
+    # Five individual staff stations.
     for member in STAFF:
         var p: Vector3 = member.pos
-        _box(self, str(member.name) + " desk", p + Vector3(0, 0.52, 0), Vector3(1.65, 0.16, 0.85), Color(0.22, 0.18, 0.15))
-        _box(self, str(member.name) + " monitor", p + Vector3(0, 1.05, -0.27), Vector3(0.72, 0.48, 0.08), Color(0.035, 0.12, 0.18))
-        var worker := _build_person(self, str(member.name), p + Vector3(0, 0, 0.72), Color(0.20, 0.28, 0.43))
-        _label_3d(worker, str(member.name), Vector3(0, 2.05, 0))
+        _build_desk(self, str(member.name), p, 1.65)
+        var worker := _build_person(self, str(member.name), p + Vector3(0, 0, 0.65), member.outfit)
+        _label_3d(worker, str(member.name), Vector3(0, 2.15, 0))
         staff_nodes.append(worker)
 
-    courier = _build_person(self, "MESSENGER", Vector3(-6.5, 0, 2.0), Color(0.35, 0.24, 0.16))
-    _box(courier, "Work order document", Vector3(0.42, 1.12, -0.12), Vector3(0.24, 0.34, 0.035), Color(0.94, 0.91, 0.78))
+    # Messenger station and visible work-order sheet.
+    courier = _build_person(self, "MESSENGER", Vector3(-6.5, 0, 2.0), Color(0.42, 0.27, 0.16))
+    _box(courier, "Work order document", Vector3(0.42, 1.10, 0.16), Vector3(0.24, 0.34, 0.035), Color(0.94, 0.91, 0.78))
+    _build_plant(self, Vector3(-7.4, 0, -5.0))
+    _build_plant(self, Vector3(7.4, 0, -5.0))
+    _build_plant(self, Vector3(7.4, 0, 4.8))
 
     var camera := Camera3D.new()
-    camera.position = Vector3(0, 10.5, 15.5)
-    camera.rotation_degrees = Vector3(-28, 0, 0)
+    camera.position = Vector3(0, 11.5, 17.5)
+    camera.rotation_degrees = Vector3(-29, 0, 0)
     camera.current = true
     add_child(camera)
 
@@ -133,8 +209,8 @@ func _label_3d(parent: Node3D, value: String, offset: Vector3) -> void:
     var label := Label3D.new()
     label.text = value
     label.position = offset
-    label.font_size = 32
-    label.modulate = Color(0.86, 0.82, 1.0)
+    label.font_size = 30
+    label.modulate = Color(0.88, 0.86, 1.0)
     parent.add_child(label)
 
 
@@ -209,7 +285,7 @@ func _poll_status() -> void:
         status_label.text = "Bridge offline — run: python -m office_bridge.server"
 
 
-func _on_http_completed(result: int, code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
+func _on_http_completed(result: int, _code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
     if result != HTTPRequest.RESULT_SUCCESS:
         status_label.text = "Backend connection failed."
         return
