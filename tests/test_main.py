@@ -89,3 +89,37 @@ def test_get_reply_falls_back_when_ai_fails(monkeypatch, capsys):
 def test_get_reply_uses_basic_replies_without_key(monkeypatch):
     monkeypatch.setattr(main, "ai_available", lambda: False)
     assert main.get_reply([], "hello").startswith("Hello!")
+
+
+# ---------- voice ----------
+
+def test_voice_on_turns_on_only_if_speaking_works(monkeypatch, capsys):
+    spoken = []
+    monkeypatch.setattr(main, "speak", lambda text: spoken.append(text))
+    assert main.handle_voice_command("voice on", False) is True
+    assert spoken == ["Voice is on."]
+    assert "Voice ON" in capsys.readouterr().out
+
+
+def test_voice_on_stays_off_when_speaking_fails(monkeypatch, capsys):
+    def broken(text):
+        raise main.VoiceError("no voice")
+
+    monkeypatch.setattr(main, "speak", broken)
+    assert main.handle_voice_command("voice on", False) is False
+    assert "no voice" in capsys.readouterr().out
+
+
+def test_voice_off_and_status(capsys):
+    assert main.handle_voice_command("voice off", True) is False
+    assert main.handle_voice_command("voice", True) is True
+    assert "Voice is ON" in capsys.readouterr().out
+
+
+def test_say_aloud_reports_errors_without_crashing(monkeypatch, capsys):
+    def broken(text):
+        raise main.VoiceError("boom")
+
+    monkeypatch.setattr(main, "speak", broken)
+    assert main.say_aloud("hello") is False
+    assert "boom" in capsys.readouterr().out

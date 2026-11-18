@@ -6,6 +6,7 @@ Run from the project root with: python -m src.main
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 from urllib.error import URLError
@@ -13,12 +14,14 @@ from urllib.error import URLError
 from src.ai import AIError, ai_available, generate_reply, get_model, get_provider
 from src.config import load_dotenv
 from src.network import check_internet, web_search
+from src.voice import VoiceError, speak
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 HISTORY_FILE = DATA_DIR / "chat_history.json"
 ENV_FILE = PROJECT_ROOT / ".env"
 PUNCTUATION = ".,!?;:()\"'।"
+VOICE_ON_VALUES = {"on", "1", "true", "yes"}
 
 
 def load_history() -> list[dict[str, str]]:
@@ -63,6 +66,7 @@ Commands / কমান্ড:
   internet         - Check internet connection
   search <query>   - Search the public web
   history          - Show recent local chat history
+  voice on / off   - Speak replies aloud (uses the computer's own voice)
   clear            - Clear terminal
   exit             - Close LISA
 
@@ -102,6 +106,30 @@ def get_reply(history: list[dict[str, str]], message: str) -> str:
     return make_reply(message)
 
 
+def say_aloud(text: str) -> bool:
+    """Speak text with the system voice. Returns False if that was not possible."""
+    try:
+        speak(text)
+    except VoiceError as error:
+        print(f"LISA: Could not speak ({error}).")
+        return False
+    return True
+
+
+def handle_voice_command(command: str, current: bool) -> bool:
+    """Handle voice / voice on / voice off. Returns the new on/off state."""
+    if command == "voice off":
+        print("LISA: Voice OFF.")
+        return False
+    if command == "voice on":
+        if say_aloud("Voice is on."):
+            print("LISA: Voice ON. I will speak my replies.")
+            return True
+        return False
+    print(f"LISA: Voice is {'ON' if current else 'OFF'}. Type 'voice on' or 'voice off'.")
+    return current
+
+
 def show_recent_history(history: list[dict[str, str]], limit: int = 10) -> None:
     if not history:
         print("LISA: এখনো কোনো chat history নেই।")
@@ -132,6 +160,7 @@ def run_search(query: str) -> None:
 def main() -> None:
     load_dotenv(ENV_FILE)
     history = load_history()
+    voice_on = os.environ.get("LISA_VOICE", "").strip().casefold() in VOICE_ON_VALUES
     show_welcome()
     while True:
         try:
@@ -166,6 +195,8 @@ def main() -> None:
             run_search("")
         elif command == "history":
             show_recent_history(history)
+        elif command in {"voice", "voice on", "voice off"}:
+            voice_on = handle_voice_command(command, voice_on)
         elif command == "clear":
             print("\033[2J\033[H", end="")
             show_welcome()
@@ -173,6 +204,8 @@ def main() -> None:
             save_message(history, "user", message)
             reply = get_reply(history, message)
             print("\nLISA >", reply)
+            if voice_on:
+                say_aloud(reply)
             save_message(history, "lisa", reply)
 
 
