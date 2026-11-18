@@ -230,11 +230,11 @@ func _update_from_status(data: Dictionary) -> void:
     var notes: Array = data.get("notes", [])
     while seen_notes < notes.size():
         var note: Dictionary = notes[seen_notes]
-        report_box.append_text("\\n\\n[b]" + str(note.get("role", "Staff")) + " report[/b]\\n" + str(note.get("result", "")))
+        report_box.append_text("\n\n[b]" + str(note.get("role", "Staff")) + " report[/b]\n" + str(note.get("result", "")))
         seen_notes += 1
     if state == "completed":
-        report_box.append_text("\\n\\n[b]LISA BOSS — FINAL REPORT[/b]\\n" + str(data.get("final", "")))
+        report_box.append_text("\n\n[b]LISA BOSS — FINAL REPORT[/b]\n" + str(data.get("final", "")))
         busy = false
     elif state == "error":
-        report_box.append_text("\\n\\n[ERROR] " + str(data.get("error", "Unknown error")))
+        report_box.append_text("\n\n[ERROR] " + str(data.get("error", "Unknown error")))
         busy = false
