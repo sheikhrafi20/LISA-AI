@@ -21,6 +21,10 @@ var courier: Node3D
 var courier_tween: Tween
 var staff_nodes: Array[Node3D] = []
 var boss: Node3D
+var office_camera: Camera3D
+var camera_tween: Tween
+var current_focus := ""
+var active_speaker: Node3D
 
 
 func _ready() -> void:
@@ -104,7 +108,20 @@ func _build_person(parent: Node3D, label: String, pos: Vector3, outfit: Color) -
     person.position = pos
     parent.add_child(person)
 
-    # Lightweight stylized humanoid assembled from primitives; rigged models come later.
+    # Drop a licensed rigged GLB into res://characters using the filenames in README.
+    # Godot imports GLB as PackedScene; keep the lightweight fallback if a model is absent.
+    var model_path := "res://characters/" + label.to_lower().replace(" ", "_") + ".glb"
+    if ResourceLoader.exists(model_path):
+        var packed := load(model_path) as PackedScene
+        if packed:
+            var imported_model := packed.instantiate()
+            imported_model.name = "RiggedCharacter"
+            imported_model.position = Vector3(0, 0, 0)
+            imported_model.scale = Vector3.ONE
+            person.add_child(imported_model)
+            return person
+
+    # Lightweight fallback while the rigged GLB assets are being added.
     _capsule_part(person, "Torso", Vector3(0, 1.02, 0), 0.27, 0.82, outfit)
     _sphere(person, "Neck", Vector3(0, 1.48, 0), 0.10, Color(0.66, 0.45, 0.34))
     _sphere(person, "Head", Vector3(0, 1.72, 0), 0.25, Color(0.72, 0.52, 0.40))
@@ -198,11 +215,11 @@ func _build_office() -> void:
     _build_plant(self, Vector3(7.4, 0, -5.0))
     _build_plant(self, Vector3(7.4, 0, 4.8))
 
-    var camera := Camera3D.new()
-    camera.position = Vector3(0, 11.5, 17.5)
-    camera.rotation_degrees = Vector3(-29, 0, 0)
-    camera.current = true
-    add_child(camera)
+    office_camera = Camera3D.new()
+    office_camera.position = Vector3(0, 11.5, 17.5)
+    office_camera.rotation_degrees = Vector3(-29, 0, 0)
+    office_camera.current = true
+    add_child(office_camera)
 
 
 func _label_3d(parent: Node3D, value: String, offset: Vector3) -> void:
@@ -301,6 +318,9 @@ func _on_http_completed(result: int, _code: int, _headers: PackedStringArray, bo
 func _update_from_status(data: Dictionary) -> void:
     var state := str(data.get("state", "idle"))
     var current := str(data.get("current_role", ""))
+    if not current.is_empty() and current != current_focus:
+        current_focus = current
+        _focus_character(_find_character(current), false)
     status_label.text = "OFFICE: " + state.to_upper() + (("  •  " + current) if not current.is_empty() else "")
     progress_label.text = "Staff reports: %s / 5" % str(data.get("completed", 0))
     var notes: Array = data.get("notes", [])
@@ -310,7 +330,40 @@ func _update_from_status(data: Dictionary) -> void:
         seen_notes += 1
     if state == "completed":
         report_box.append_text("\n\n[b]LISA BOSS — FINAL REPORT[/b]\n" + str(data.get("final", "")))
+        status_label.text = "LISA BOSS IS PRESENTING THE FINAL REPORT"
+        _focus_character(boss, true)
         busy = false
     elif state == "error":
         report_box.append_text("\n\n[ERROR] " + str(data.get("error", "Unknown error")))
         busy = false
+
+
+func _find_character(role: String) -> Node3D:
+    var key := role.to_lower()
+    if key.contains("boss") or key.contains("coordinator"):
+        return boss
+    if key.contains("research"):
+        return staff_nodes[0] if staff_nodes.size() > 0 else null
+    if key.contains("plan"):
+        return staff_nodes[1] if staff_nodes.size() > 1 else null
+    if key.contains("anal"):
+        return staff_nodes[2] if staff_nodes.size() > 2 else null
+    if key.contains("critic") or key.contains("quality"):
+        return staff_nodes[3] if staff_nodes.size() > 3 else null
+    if key.contains("writ"):
+        return staff_nodes[4] if staff_nodes.size() > 4 else null
+    return null
+
+
+func _focus_character(character: Node3D, final_report: bool) -> void:
+    if character == null or office_camera == null:
+        return
+    active_speaker = character
+    var target := character.global_position + Vector3(0, 1.45, 0)
+    var camera_offset := Vector3(0, 2.0, 4.2) if final_report else Vector3(0, 2.2, 5.2)
+    if camera_tween and camera_tween.is_running():
+        camera_tween.kill()
+    camera_tween = create_tween()
+    camera_tween.set_parallel(true)
+    camera_tween.tween_property(office_camera, "global_position", target + camera_offset, 0.9)
+    camera_tween.tween_callback(func(): office_camera.look_at(target, Vector3.UP)).set_delay(0.92)
