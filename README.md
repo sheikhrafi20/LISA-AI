@@ -18,12 +18,13 @@
 
 **LISA** is a personal AI assistant project by **RAFI**, built with Python. It is developed gradually, starting with a clean foundation and adding useful assistant capabilities in small, testable stages.
 
-The current version (**V4**) is a command-line assistant that chats in **বাংলা + English**, can use a real **AI model** for replies, and has basic internet utilities.
+The current version (**V4**) is a command-line assistant that chats in **বাংলা + English**, can use a real **AI model** for replies, can **speak its replies aloud**, and has basic internet utilities.
 
 ## 🚀 Features (V4)
 
 - 🤖 **AI replies**, either **free on your own computer (Ollama)** or through the Anthropic API (paid)
 - 🔁 Automatic fallback to basic rule-based replies when AI is off or unavailable
+- 🔊 **Voice output**: LISA can speak replies using your computer's own voices (free, offline)
 - 🗣️ Bilingual (বাংলা + English) conversation
 - 🌐 Internet connection check
 - 🔎 Web search from the terminal (returns links, not AI-generated answers)
@@ -45,10 +46,16 @@ No account, no API key, no cost. Your messages never leave your computer.
    ollama pull llama3.2
    ```
 
-2. Copy `.env.example` to `.env`. It already contains `LISA_PROVIDER=ollama`.
+2. Create a `.env` file in the project folder. In Windows PowerShell:
+
+   ```powershell
+   "LISA_PROVIDER=ollama" | Out-File -Encoding ascii .env
+   ```
+
+   On Mac/Linux, copy `.env.example` to `.env` instead.
 3. Make sure Ollama is running, then start LISA and type `about`. It should show `AI: ON (ollama, ...)`.
 
-Use another model with `LISA_MODEL=<name>` in `.env`. Bigger models give better answers but need more RAM. Ollama runs on a computer, not on a phone.
+Use another model with `LISA_MODEL=<name>` in `.env`. Bigger models give better answers but need more RAM. Small models are weaker in বাংলা than in English. Ollama runs on a computer, not on a phone.
 
 ### Option 2: Anthropic API (paid)
 
@@ -59,6 +66,20 @@ Use another model with `LISA_MODEL=<name>` in `.env`. Bigger models give better 
 Optional: set `LISA_MODEL` to use a different model (default: `claude-haiku-5-5`).
 
 `.env` is listed in `.gitignore`, so your key is never committed. If the AI cannot be reached (Ollama not running, no internet, wrong key), LISA prints the reason and answers with basic replies instead.
+
+## 🔊 Voice
+
+Type `voice on` and LISA speaks every reply aloud. Type `voice off` to stop. To start with voice on, add `LISA_VOICE=on` to `.env`.
+
+It uses the voices that come with your operating system, so it is free, works offline and needs no extra packages:
+
+| System | Uses | Note |
+|---|---|---|
+| Windows | Built-in speech (System.Speech) | বাংলা is spoken only if a Bengali voice is installed in Windows. Otherwise LISA says so, and English still works. |
+| macOS | `say` | Available voices depend on your Mac. |
+| Linux | `espeak-ng` | Install it first, for example `sudo apt install espeak-ng`. |
+
+Voice **input** (talking to LISA with a microphone) is planned. See the [open issues](https://github.com/sheikhrafi20/LISA-AI/issues).
 
 ## 🖥️ Demo
 
@@ -95,7 +116,7 @@ python -m pip install -r requirements.txt
 python -m src.main
 ```
 
-Run it from the project root.
+Run it from the project folder (`LISA-AI`). Running it from another folder gives `No module named 'src'`.
 
 ## 💬 Commands
 
@@ -107,6 +128,7 @@ Run it from the project root.
 | `internet` | Check internet connection |
 | `search <query>` | Search the public web |
 | `history` | Show recent chat history |
+| `voice on` / `voice off` | Speak replies aloud, or stop |
 | `clear` | Clear the terminal |
 | `exit` | Close LISA |
 
@@ -119,7 +141,7 @@ python -m pip install -r requirements-dev.txt
 python -m pytest
 ```
 
-Tests cover reply matching, AI request/response handling for both providers, `.env` loading, chat history saving/loading, and the web search and internet check. They use fake network responses, so they run offline and never need an API key or Ollama.
+Tests cover reply matching, AI request/response handling for both providers, voice output, `.env` loading, chat history saving/loading, and the web search and internet check. They use fake network and speech responses, so they run offline and never need an API key, Ollama or speakers.
 
 ## 🧰 Technology
 
@@ -128,6 +150,7 @@ Tests cover reply matching, AI request/response handling for both providers, `.e
 | Python | Main programming language |
 | Ollama | Optional free local AI |
 | Anthropic Messages API | Optional paid AI |
+| OS speech engines | Optional voice output |
 | certifi | Secure HTTPS certificates |
 | pytest | Automated tests |
 | Git & GitHub | Version control and project hosting |
@@ -141,11 +164,13 @@ LISA-AI/
 ├── src/
 │   ├── main.py            # CLI, commands and chat loop
 │   ├── ai.py              # AI replies (Ollama / Anthropic)
+│   ├── voice.py           # Voice output (system voices)
 │   ├── config.py          # Small .env loader
 │   └── network.py         # Internet check and web search
 ├── tests/
 │   ├── test_main.py
 │   ├── test_ai.py
+│   ├── test_voice.py
 │   ├── test_config.py
 │   └── test_network.py
 ├── .env.example
@@ -170,6 +195,7 @@ LISA-AI/
 - Web search sends only the query you type.
 - **Ollama:** replies are generated on your computer. Nothing is sent to an AI service.
 - **Anthropic API:** your recent chat messages (up to the last 20) are sent to the Anthropic API for each reply. Do not type secrets into the chat.
+- **Voice output** uses your operating system's speech engine on your computer.
 - With AI off, nothing is sent to any AI service.
 
 ## 🚧 Project status
