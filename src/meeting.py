@@ -42,7 +42,8 @@ def run_meeting(
             "Do not claim you used tools or verified facts unless you actually did.\n"
             f"USER TASK:\n{task}"
         )
-        result = get_reply(context, prompt)
+        role_history = [*context, {"role": "user", "message": prompt}]
+        result = get_reply(role_history, prompt)
         notes.append((name, result))
         if on_update:
             on_update(name, result)
@@ -55,4 +56,5 @@ def run_meeting(
         "a practical next step. Do not pretend these are independent AI vendors.\n"
         f"USER TASK:\n{task}\n\nROLE NOTES:\n{combined}"
     )
-    return get_reply(context, coordinator_prompt)
+    coordinator_history = [*context, {"role": "user", "message": coordinator_prompt}]
+    return get_reply(coordinator_history, coordinator_prompt)
