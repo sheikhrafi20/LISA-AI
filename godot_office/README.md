@@ -29,3 +29,28 @@ Type a task in the office panel and send it to LISA Boss. The Python bridge runs
 - The five staff roles are separate prompts using the same configured model/provider, not five independent AI services.
 - The messenger animation is a visual prototype; task execution is performed by the Python backend.
 - The current 8 GB, CPU-only laptop may need low render settings and a small Ollama model for responsive use.
+
+
+## Character asset upgrade (GLB-ready)
+
+The office now supports rigged humanoid GLB scenes. Put properly licensed character files in `godot_office/characters/` with these exact names:
+
+- `lisa_boss.glb`
+- `researcher.glb`
+- `planner.glb`
+- `analyst.glb`
+- `critic.glb`
+- `writer.glb`
+- `messenger.glb`
+
+Each file should contain a humanoid mesh and a `Skeleton3D`; ideally include Idle, Walk and Talk/gesture clips in an `AnimationPlayer`. Keep model scale close to 1.7–1.9 metres tall and orient the character's face toward local +Z. If a file is missing, the scene falls back to the simple procedural figure.
+
+The camera now follows the active staff role when a report is being processed and moves to a closer front-facing shot of LISA Boss when the final report is ready. This is a camera focus/presentation step only: it does not yet create true facial lip-sync or real paper hand-to-hand animation.
+
+### Animation integration status
+
+GLB loading is wired, but animation playback, synchronized walking, hand attachment/document transfer, voice output and lip-sync are still pending. Godot imports glTF/GLB scenes and their AnimationPlayer tracks; AnimationTree can then blend imported clips. See the [Godot scene import guide](https://docs.godotengine.org/en/stable/tutorials/assets_pipeline/importing_3d_scenes/index.html) and [AnimationTree guide](https://docs.godotengine.org/en/stable/tutorials/animation/animation_tree.html).
+
+### Current laptop profile
+
+Use low-poly or optimized GLB models (preferably under about 10–15 MB each), 1K textures or smaller, and avoid high-poly hair/cloth simulation on the 8 GB CPU-only laptop.
