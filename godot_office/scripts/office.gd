@@ -134,8 +134,18 @@ func _build_person(parent: Node3D, label: String, pos: Vector3, outfit: Color) -
     _capsule_part(person, "Right leg", Vector3(0.13, 0.34, 0), 0.105, 0.58, Color(0.075, 0.09, 0.14))
     _box(person, "Left shoe", Vector3(-0.13, 0.055, 0.08), Vector3(0.20, 0.10, 0.34), Color(0.035, 0.035, 0.045))
     _box(person, "Right shoe", Vector3(0.13, 0.055, 0.08), Vector3(0.20, 0.10, 0.34), Color(0.035, 0.035, 0.045))
-    _sphere(person, "Left eye", Vector3(-0.085, 1.75, 0.215), 0.025, Color(0.025, 0.02, 0.02))
-    _sphere(person, "Right eye", Vector3(0.085, 1.75, 0.215), 0.025, Color(0.025, 0.02, 0.02))
+    # Face details are deliberately placed on the +Z/front side for close-up shots.
+    _sphere(person, "Left ear", Vector3(-0.245, 1.70, 0.015), 0.065, Color(0.62, 0.42, 0.33))
+    _sphere(person, "Right ear", Vector3(0.245, 1.70, 0.015), 0.065, Color(0.62, 0.42, 0.33))
+    _sphere(person, "Left eye white", Vector3(-0.085, 1.755, 0.218), 0.043, Color(0.96, 0.94, 0.89))
+    _sphere(person, "Right eye white", Vector3(0.085, 1.755, 0.218), 0.043, Color(0.96, 0.94, 0.89))
+    _sphere(person, "Left pupil", Vector3(-0.085, 1.755, 0.254), 0.021, Color(0.025, 0.02, 0.02))
+    _sphere(person, "Right pupil", Vector3(0.085, 1.755, 0.254), 0.021, Color(0.025, 0.02, 0.02))
+    _capsule_part(person, "Left eyebrow", Vector3(-0.085, 1.825, 0.215), 0.018, 0.11, Color(0.12, 0.075, 0.055), -0.08)
+    _capsule_part(person, "Right eyebrow", Vector3(0.085, 1.825, 0.215), 0.018, 0.11, Color(0.12, 0.075, 0.055), 0.08)
+    _sphere(person, "Nose", Vector3(0, 1.69, 0.255), 0.045, Color(0.67, 0.46, 0.36))
+    _capsule_part(person, "Mouth", Vector3(0, 1.615, 0.226), 0.014, 0.085, Color(0.30, 0.10, 0.10), PI / 2.0)
+    _box(person, "Hair fringe", Vector3(0, 1.865, 0.16), Vector3(0.34, 0.095, 0.18), Color(0.12, 0.085, 0.07))
     return person
 
 
@@ -359,8 +369,8 @@ func _focus_character(character: Node3D, final_report: bool) -> void:
     if character == null or office_camera == null:
         return
     active_speaker = character
-    var target := character.global_position + Vector3(0, 1.45, 0)
-    var camera_offset := Vector3(0, 2.0, 4.2) if final_report else Vector3(0, 2.2, 5.2)
+    var target := character.global_position + Vector3(0, 1.68, 0)
+    var camera_offset := Vector3(0, 1.15, 2.65) if final_report else Vector3(0, 1.35, 3.25)
     if camera_tween and camera_tween.is_running():
         camera_tween.kill()
     camera_tween = create_tween()
