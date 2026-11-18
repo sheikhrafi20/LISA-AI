@@ -6,14 +6,26 @@ Variables that are already set in the real environment are never overwritten.
 
 from __future__ import annotations
 
+import codecs
 import os
 from pathlib import Path
 
 
+def _read_text(path: Path) -> str:
+    """Read a text file as UTF-8, UTF-8 with BOM, or UTF-16.
+
+    Windows PowerShell's `echo X > .env` writes UTF-16, so UTF-16 must work too.
+    """
+    raw = path.read_bytes()
+    if raw.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
+        return raw.decode("utf-16")
+    return raw.decode("utf-8-sig")
+
+
 def load_dotenv(path: Path) -> None:
     try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except OSError:
+        lines = _read_text(path).splitlines()
+    except (OSError, UnicodeDecodeError):
         return
     for line in lines:
         line = line.strip()

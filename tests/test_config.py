@@ -28,3 +28,26 @@ def test_load_dotenv_does_not_override_existing(tmp_path, monkeypatch):
 
 def test_load_dotenv_missing_file_is_ignored(tmp_path):
     load_dotenv(tmp_path / "missing.env")
+
+
+def test_load_dotenv_reads_powershell_utf16_file(tmp_path, monkeypatch):
+    monkeypatch.delenv("LISA_TEST_A", raising=False)
+    env_file = tmp_path / ".env"
+    # `echo LISA_TEST_A=ollama > .env` in Windows PowerShell: UTF-16 LE with BOM and CRLF
+    env_file.write_bytes("LISA_TEST_A=ollama\r\n".encode("utf-16"))
+    load_dotenv(env_file)
+    assert os.environ["LISA_TEST_A"] == "ollama"
+
+
+def test_load_dotenv_reads_utf8_with_bom(tmp_path, monkeypatch):
+    monkeypatch.delenv("LISA_TEST_A", raising=False)
+    env_file = tmp_path / ".env"
+    env_file.write_bytes("LISA_TEST_A=ollama\n".encode("utf-8-sig"))
+    load_dotenv(env_file)
+    assert os.environ["LISA_TEST_A"] == "ollama"
+
+
+def test_load_dotenv_unreadable_encoding_does_not_crash(tmp_path):
+    env_file = tmp_path / ".env"
+    env_file.write_bytes(b"\x80\x81\x82 not text")
+    load_dotenv(env_file)
