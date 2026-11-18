@@ -213,3 +213,16 @@ LISA is in **active early development**. See the [open issues](https://github.co
 *Built with curiosity, Python, and consistent learning.*
 
 </div>
+
+
+## 🎙️ Live talking-avatar API (new starter)
+
+A separate localhost API now reuses LISA's existing Python AI engine, local chat history and system speech output. Start it from the repository root:
+
+```powershell
+python -m lisa_voice.server
+```
+
+It listens on `127.0.0.1:8766`. Optional local microphone transcription is available after `python -m pip install -r requirements-voice.txt`; the first run downloads the Whisper `tiny` model. See [lisa_voice/README.md](lisa_voice/README.md) for endpoints and limitations.
+
+This is a backend starter only. The Godot microphone client, two selectable realistic human GLB characters, facial lip-sync and finished avatar interface are not yet implemented.
