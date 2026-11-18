@@ -1,0 +1,3 @@
+# Optional CPU speech-to-text for LISA microphone input.
+# Installs a small Whisper model at first use (requires internet once).
+faster-whisper>=1.1.0
