@@ -22,7 +22,7 @@ The current version (**V4**) is a command-line assistant that chats in **বা�
 
 ## 🚀 Features (V4)
 
-- 🤖 **AI replies** through the Anthropic API (turn on by adding your own API key)
+- 🤖 **AI replies**, either **free on your own computer (Ollama)** or through the Anthropic API (paid)
 - 🔁 Automatic fallback to basic rule-based replies when AI is off or unavailable
 - 🗣️ Bilingual (বাংলা + English) conversation
 - 🌐 Internet connection check
@@ -33,24 +33,36 @@ The current version (**V4**) is a command-line assistant that chats in **বা�
 
 ## 🔑 Turning on AI
 
-AI is **off by default**. LISA uses it only when you add your own API key:
+AI is **off by default**. Choose one option.
 
-1. Create an API key in the [Anthropic Console](https://console.anthropic.com/).
-2. Copy `.env.example` to `.env` and put your key in it:
+### Option 1: Ollama (free, private, runs on your computer)
 
-   ```text
-   ANTHROPIC_API_KEY=your-api-key-here
+No account, no API key, no cost. Your messages never leave your computer.
+
+1. Install [Ollama](https://ollama.com/) and download a model:
+
+   ```bash
+   ollama pull llama3.2
    ```
 
-3. Run LISA and type `about`. It should show `AI: ON`.
+2. Copy `.env.example` to `.env`. It already contains `LISA_PROVIDER=ollama`.
+3. Make sure Ollama is running, then start LISA and type `about`. It should show `AI: ON (ollama, ...)`.
 
-Optional: set `LISA_MODEL` in `.env` to use a different model (default: `claude-haiku-5-5`).
+Use another model with `LISA_MODEL=<name>` in `.env`. Bigger models give better answers but need more RAM. Ollama runs on a computer, not on a phone.
 
-`.env` is listed in `.gitignore`, so your key is never committed. If the AI service cannot be reached (no internet, wrong key, rate limit), LISA prints the reason and answers with basic replies instead.
+### Option 2: Anthropic API (paid)
+
+1. Create an API key in the [Anthropic Console](https://console.anthropic.com/). API usage costs money.
+2. In `.env`, remove the `LISA_PROVIDER` line and set `ANTHROPIC_API_KEY=your-api-key-here`.
+3. Start LISA and type `about`. It should show `AI: ON (anthropic, ...)`.
+
+Optional: set `LISA_MODEL` to use a different model (default: `claude-haiku-5-5`).
+
+`.env` is listed in `.gitignore`, so your key is never committed. If the AI cannot be reached (Ollama not running, no internet, wrong key), LISA prints the reason and answers with basic replies instead.
 
 ## 🖥️ Demo
 
-This is real output from running LISA **without** an API key (basic replies):
+This is real output from running LISA **without** AI turned on (basic replies):
 
 ```text
 ══════════════════════════════════════════════════════
@@ -64,7 +76,7 @@ This is real output from running LISA **without** an API key (basic replies):
 
 RAFI > about
 LISA V4: Python assistant with bilingual chat, local history, web search and AI replies.
-AI: OFF — add ANTHROPIC_API_KEY to the .env file to turn it on.
+AI: OFF — see the README (Turning on AI) to use Ollama or an API key.
 
 RAFI > hello
 
@@ -107,14 +119,15 @@ python -m pip install -r requirements-dev.txt
 python -m pytest
 ```
 
-Tests cover reply matching, the AI request/response handling, `.env` loading, chat history saving/loading, and the web search and internet check. They use fake network responses, so they run offline and never need an API key.
+Tests cover reply matching, AI request/response handling for both providers, `.env` loading, chat history saving/loading, and the web search and internet check. They use fake network responses, so they run offline and never need an API key or Ollama.
 
 ## 🧰 Technology
 
 | Technology | Purpose |
 |---|---|
 | Python | Main programming language |
-| Anthropic Messages API | Optional AI replies |
+| Ollama | Optional free local AI |
+| Anthropic Messages API | Optional paid AI |
 | certifi | Secure HTTPS certificates |
 | pytest | Automated tests |
 | Git & GitHub | Version control and project hosting |
@@ -127,7 +140,7 @@ LISA-AI/
 │   └── lisa-banner.svg
 ├── src/
 │   ├── main.py            # CLI, commands and chat loop
-│   ├── ai.py              # AI replies (Anthropic API)
+│   ├── ai.py              # AI replies (Ollama / Anthropic)
 │   ├── config.py          # Small .env loader
 │   └── network.py         # Internet check and web search
 ├── tests/
@@ -155,7 +168,9 @@ LISA-AI/
 
 - Chat history is stored locally in `data/chat_history.json`, which is excluded from Git via `.gitignore`.
 - Web search sends only the query you type.
-- **When AI is on**, your recent chat messages (up to the last 20) are sent to the Anthropic API to produce each reply. Do not type secrets into the chat. With no API key, nothing is sent to any AI service.
+- **Ollama:** replies are generated on your computer. Nothing is sent to an AI service.
+- **Anthropic API:** your recent chat messages (up to the last 20) are sent to the Anthropic API for each reply. Do not type secrets into the chat.
+- With AI off, nothing is sent to any AI service.
 
 ## 🚧 Project status
 
