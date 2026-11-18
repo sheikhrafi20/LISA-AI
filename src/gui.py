@@ -14,6 +14,7 @@ from tkinter import font, messagebox, scrolledtext, ttk
 
 from src.ai import ai_available, get_model, get_provider
 from src.avatar import LisaAvatar
+from src.meeting import run_meeting
 from src.config import load_dotenv
 from src.main import ENV_FILE, get_reply, load_history, save_message, say_aloud
 
@@ -127,6 +128,13 @@ class LisaDesktop:
             font=(self.ui_font, 9), padx=12, pady=6, cursor="hand2",
         )
         self.voice_button.pack(side="left")
+        self.meeting_button = tk.Button(
+            footer, text="AI Meeting", command=self.start_meeting,
+            bg="#342653", fg="#e8dcff", activebackground="#49366f",
+            activeforeground="#ffffff", relief="flat",
+            font=(self.ui_font, 9, "bold"), padx=12, pady=6, cursor="hand2",
+        )
+        self.meeting_button.pack(side="left", padx=(8, 0))
         tk.Label(
             footer, text="Chats are saved locally on this computer",
             bg=BG, fg=MUTED, font=(self.ui_font, 9),
@@ -174,6 +182,32 @@ class LisaDesktop:
         self.status.configure(text="LISA is thinking…", fg=PURPLE)
         threading.Thread(target=self._answer_worker, args=(message,), daemon=True).start()
 
+    def start_meeting(self) -> None:
+        task = self.entry.get().strip()
+        if not task or self.busy:
+            if not task:
+                self._append("LISA", "AI Meeting শুরু করতে আগে কাজটি লিখে দাও।", "system")
+            return
+        self.entry.delete(0, "end")
+        save_message(self.history, "user", "[AI Meeting Task] " + task)
+        self._append("You · MEETING TASK", task, "user")
+        self.busy = True
+        self.send_button.configure(state="disabled")
+        self.meeting_button.configure(state="disabled", text="Meeting…")
+        self.status.configure(text="AI team is reviewing the task…", fg=PURPLE)
+        threading.Thread(
+            target=self._meeting_worker, args=(task,), daemon=True
+        ).start()
+
+    def _meeting_worker(self, task: str) -> None:
+        try:
+            def report(role: str, note: str) -> None:
+                self.results.put(("meeting_role", f"{role}\\n{note}"))
+            reply = run_meeting(task, self.history, report)
+            self.results.put(("meeting_reply", reply))
+        except Exception as error:
+            self.results.put(("error", str(error)))
+
     def _answer_worker(self, message: str) -> None:
         try:
             reply = get_reply(self.history, message)
@@ -187,15 +221,20 @@ class LisaDesktop:
         try:
             while True:
                 kind, value = self.results.get_nowait()
-                if kind == "reply":
+                if kind == "meeting_role":
+                    role, note = value.split("\\n", 1)
+                    self._append(f"MEETING · {role}", note, "system")
+                    continue
+                if kind in {"reply", "meeting_reply"}:
                     save_message(self.history, "lisa", value)
-                    self._append("LISA", value, "lisa")
+                    self._append("LISA · FINAL", value, "lisa")
                     self.avatar.set_talking(True)
                     self.root.after(1800, lambda: self.avatar.set_talking(False))
                 else:
                     self._append("LISA", f"সমস্যা হয়েছে: {value}", "system")
                 self.busy = False
                 self.send_button.configure(state="normal", text="Send")
+                self.meeting_button.configure(state="normal", text="AI Meeting")
                 self._set_status()
         except queue.Empty:
             pass
