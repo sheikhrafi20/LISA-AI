@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from urllib.error import URLError
 
-from src.ai import AIError, ai_available, generate_reply, get_model
+from src.ai import AIError, ai_available, generate_reply, get_model, get_provider
 from src.config import load_dotenv
 from src.network import check_internet, web_search
 
@@ -67,7 +67,7 @@ Commands / কমান্ড:
   exit             - Close LISA
 
 বাংলা বা English-এ সাধারণ মেসেজও লিখতে পারো।
-AI চালু করতে .env ফাইলে ANTHROPIC_API_KEY দাও (README দেখো)।
+AI চালু করতে README-র 'Turning on AI' অংশ দেখো (Ollama হলে ফ্রি)।
 """)
 
 
@@ -88,7 +88,7 @@ def make_reply(message: str) -> str:
     if _has_any(text, ("ধন্যবাদ", "thanks"), ("thank you",)):
         return "স্বাগতম! / You're welcome."
     return ("তোমার মেসেজটি পেয়েছি। AI চালু নেই, তাই আমি শুধু সাধারণ কিছু কথা বুঝি। "
-            "AI চালু করতে .env ফাইলে ANTHROPIC_API_KEY দাও, অথবা ওয়েবে খুঁজতে "
+            "AI চালু করতে README দেখো, অথবা ওয়েবে খুঁজতে "
             "search <তোমার প্রশ্ন> লিখো।")
 
 
@@ -151,9 +151,9 @@ def main() -> None:
         elif command == "about":
             print("LISA V4: Python assistant with bilingual chat, local history, web search and AI replies.")
             if ai_available():
-                print(f"AI: ON (model: {get_model()})")
+                print(f"AI: ON ({get_provider()}, model: {get_model()})")
             else:
-                print("AI: OFF — add ANTHROPIC_API_KEY to the .env file to turn it on.")
+                print("AI: OFF — see the README (Turning on AI) to use Ollama or an API key.")
         elif command == "time":
             print("LISA:", datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z"))
         elif command == "internet":
