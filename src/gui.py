@@ -13,6 +13,7 @@ from pathlib import Path
 from tkinter import font, messagebox, scrolledtext, ttk
 
 from src.ai import ai_available, get_model, get_provider
+from src.avatar import LisaAvatar
 from src.config import load_dotenv
 from src.main import ENV_FILE, get_reply, load_history, save_message, say_aloud
 
@@ -75,10 +76,20 @@ class LisaDesktop:
         )
         self.status.pack(side="right", pady=(8, 0))
 
-        body = tk.Frame(self.root, bg=BG, padx=18, pady=16)
+        body = tk.Frame(self.root, bg=BG, padx=14, pady=12)
         body.pack(fill="both", expand=True)
+        avatar_panel = tk.Frame(body, bg="#171226", padx=8, pady=10)
+        avatar_panel.pack(side="left", fill="y", padx=(0, 12))
+        self.avatar = LisaAvatar(avatar_panel, width=220, height=270)
+        self.avatar.pack()
+        tk.Label(
+            avatar_panel, text="2D AVATAR  •  3D MODE: COMING NEXT",
+            bg="#171226", fg=MUTED, font=(self.ui_font, 8),
+        ).pack(pady=(8, 0))
+        chat_panel = tk.Frame(body, bg=BG)
+        chat_panel.pack(side="left", fill="both", expand=True)
         self.chat = scrolledtext.ScrolledText(
-            body, wrap="word", state="disabled", relief="flat",
+            chat_panel, wrap="word", state="disabled", relief="flat",
             bg=BG, fg=TEXT, insertbackground=TEXT,
             font=(self.ui_font, 11), padx=14, pady=12,
             borderwidth=0, highlightthickness=1,
@@ -179,6 +190,8 @@ class LisaDesktop:
                 if kind == "reply":
                     save_message(self.history, "lisa", value)
                     self._append("LISA", value, "lisa")
+                    self.avatar.set_talking(True)
+                    self.root.after(1800, lambda: self.avatar.set_talking(False))
                 else:
                     self._append("LISA", f"সমস্যা হয়েছে: {value}", "system")
                 self.busy = False
