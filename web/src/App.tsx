@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import Stage from './components/Stage'
 import Waveform from './components/Waveform'
@@ -6,16 +6,22 @@ import Controls from './components/Controls'
 import Settings from './components/Settings'
 import DevPreview from './components/DevPreview'
 import { GearIcon } from './icons'
-import { STATE_COPY, type LisaState } from './state'
+import { STATE_COPY } from './state'
 import { useSettings } from './useSettings'
+import { useAvatarState } from './hooks/useAvatarState'
+import { useGazeTracking } from './hooks/useGazeTracking'
+import type { Gaze, Pose } from './types/avatar'
 
 export default function App() {
-  const [state, setState] = useState<LisaState>('idle')
+  const { state, send, force } = useAvatarState()
+  const gaze = useRef<Gaze>({ x: 0, y: 0 })
+  const lip = useRef<Pose | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const { settings, update } = useSettings()
   const closeSettings = useCallback(() => setSettingsOpen(false), [])
   const copy = STATE_COPY[state]
+  useGazeTracking(gaze)
 
   useEffect(() => {
     if (!toast) return
@@ -25,7 +31,7 @@ export default function App() {
 
   return (
     <main data-state={state} data-motion={settings.reduceMotion ? 'reduced' : 'full'} className="studio relative h-dvh w-full overflow-hidden text-ink">
-      <Stage state={state} />
+      <Stage state={state} gaze={gaze} lip={lip} />
 
       <header className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-5 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-8">
         <h1 className="text-xl font-light tracking-[0.5em]">LISA</h1>
@@ -34,7 +40,7 @@ export default function App() {
         </button>
       </header>
 
-      {import.meta.env.DEV && <DevPreview state={state} onPick={setState} />}
+      {import.meta.env.DEV && <DevPreview state={state} onPick={force} />}
 
       <section className="absolute inset-x-0 bottom-0 z-10 flex flex-col items-center gap-4 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
         <div className="text-center">
@@ -42,7 +48,7 @@ export default function App() {
           <p className="text-sm text-ink/55">{copy.hint}</p>
         </div>
         <Waveform state={state} />
-        <Controls state={state} onUnavailable={setToast} onStop={() => setState('idle')} />
+        <Controls state={state} onUnavailable={setToast} onStop={() => send('STOP_SPEAKING')} />
       </section>
 
       <AnimatePresence>

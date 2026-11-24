@@ -5,12 +5,18 @@ import App from './App'
 const status = () => screen.getByTestId('status')
 const preview = (name: RegExp) => userEvent.click(screen.getByRole('button', { name }))
 
-describe('LISA UI (Phase 1)', () => {
+describe('LISA UI', () => {
   it('starts in the idle state', () => {
     render(<App />)
     expect(status()).toHaveTextContent('Ready')
     expect(screen.getByRole('main')).toHaveAttribute('data-state', 'idle')
     expect(screen.getByRole('heading', { name: 'LISA' })).toBeInTheDocument()
+  })
+
+  it('shows a clear fallback when WebGL is not available (as in this test environment)', () => {
+    render(<App />)
+    expect(screen.getByTestId('avatar-fallback')).toHaveTextContent('3D is not available')
+    expect(screen.queryByTestId('avatar-loading')).not.toBeInTheDocument()
   })
 
   it.each([
