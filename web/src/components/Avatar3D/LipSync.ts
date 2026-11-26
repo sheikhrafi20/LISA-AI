@@ -83,8 +83,8 @@ export function poseFromFeatures(f: Features): Pose {
 /** Reads an AnalyserNode every frame and returns a smoothed mouth pose (opens fast, closes a bit slower). */
 export class LipSyncAnalyzer {
   readonly pose: Pose = silentPose()
-  private time: Float32Array
-  private freq: Float32Array
+  private time = new Float32Array(0)
+  private freq = new Float32Array(0)
 
   constructor(private analyser: AnalyserNode, private attack = 30, private release = 14) {
     this.time = new Float32Array(analyser.fftSize)
