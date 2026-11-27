@@ -28,8 +28,12 @@ export interface Features {
 const GATE = 0.01 // RMS below this is treated as silence (background noise)
 const REFERENCE = 0.2 // RMS that counts as "loud" speech
 
+// Typed through a function so this compiles with both older and newer TypeScript typed-array typings.
+const makeBuffer = (length: number) => new Float32Array(length)
+type Buffer32 = ReturnType<typeof makeBuffer>
+
 /** Measures one analysis frame. `freqDb` is AnalyserNode.getFloatFrequencyData (decibels per bin). */
-export function computeFeatures(time: Float32Array, freqDb: Float32Array, sampleRate: number): Features {
+export function computeFeatures(time: ArrayLike<number>, freqDb: ArrayLike<number>, sampleRate: number): Features {
   let sum = 0
   for (let i = 0; i < time.length; i++) sum += time[i] * time[i]
   const rms = Math.sqrt(sum / Math.max(1, time.length))
@@ -83,12 +87,12 @@ export function poseFromFeatures(f: Features): Pose {
 /** Reads an AnalyserNode every frame and returns a smoothed mouth pose (opens fast, closes a bit slower). */
 export class LipSyncAnalyzer {
   readonly pose: Pose = silentPose()
-  private time = new Float32Array(0)
-  private freq = new Float32Array(0)
+  private time: Buffer32
+  private freq: Buffer32
 
   constructor(private analyser: AnalyserNode, private attack = 30, private release = 14) {
-    this.time = new Float32Array(analyser.fftSize)
-    this.freq = new Float32Array(analyser.frequencyBinCount)
+    this.time = makeBuffer(analyser.fftSize)
+    this.freq = makeBuffer(analyser.frequencyBinCount)
   }
 
   /** Settings that suit speech. Call once on a new AnalyserNode. */

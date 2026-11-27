@@ -1,78 +1,96 @@
-import { Mesh, BoxGeometry, Group, Bone } from 'three'
+import { Group, Mesh, Object3D } from 'three'
 import { buildBindings, findBone, reportMorphs } from './AvatarModel'
 import { frameDistance } from './AvatarCamera'
 import { EXPECTED_MORPHS } from './AvatarExpressions'
 import { isMobileDevice, isWebGLAvailable } from './webgl'
 
-/** A plain mesh that carries morph targets with the given names. */
-function morphMesh(names: string[]) {
-  const mesh = new Mesh(new BoxGeometry())
+const morphMesh = (names: string[]) => {
+  const mesh = new Mesh()
   mesh.morphTargetDictionary = Object.fromEntries(names.map((n, i) => [n, i]))
   mesh.morphTargetInfluences = names.map(() => 0)
   return mesh
 }
 
-describe('morph target discovery (nothing is assumed about the model)', () => {
-  it('collects names from every mesh that has morph targets', () => {
+describe('model inspection (nothing is assumed)', () => {
+  it('finds bones whichever way the loader spelled the name', () => {
     const root = new Group()
-    root.add(morphMesh(['jawOpen', 'mouthSmile']), morphMesh(['jawOpen', 'eyeBlinkLeft']), new Mesh(new BoxGeometry()))
-    const b = buildBindings(root)
-    expect([...b.keys()].sort()).toEqual(['eyeBlinkLeft', 'jawOpen', 'mouthSmile'])
-    expect(b.get('jawOpen')).toHaveLength(2) // jawOpen drives the face and the teeth
-    expect(b.get('mouthSmile')?.[0].index).toBe(1)
-  })
-  it('reports exactly which expected channels the model is missing', () => {
-    const root = new Group()
-    root.add(morphMesh(['jawOpen', 'someUnknownTarget']))
-    const r = reportMorphs(buildBindings(root))
-    expect(r.found).toEqual(['jawOpen'])
-    expect(r.missing).toContain('mouthSmile')
-    expect(r.missing).not.toContain('jawOpen')
-    expect(r.found.length + r.missing.length).toBe(EXPECTED_MORPHS.length)
-    expect(r.all).toContain('someUnknownTarget')
-  })
-  it('an empty model gives an empty binding, not a crash', () => {
-    const r = reportMorphs(buildBindings(new Group()))
-    expect(r.found).toEqual([])
-    expect(r.missing).toHaveLength(EXPECTED_MORPHS.length)
-  })
-  it('finds bones under both spellings of the name', () => {
-    const root = new Group()
-    const a = new Bone(); a.name = 'mixamorigHead'
-    const b = new Bone(); b.name = 'mixamorig:Neck'
-    root.add(a, b)
-    expect(findBone(root, 'Head')).toBe(a)
-    expect(findBone(root, 'Neck')).toBe(b)
+    const head = new Object3D(); head.name = 'mixamorigHead'
+    const neck = new Object3D(); neck.name = 'mixamorig:Neck'
+    root.add(head, neck)
+    expect(findBone(root, 'Head')).toBe(head)
+    expect(findBone(root, 'Neck')).toBe(neck)
     expect(findBone(root, 'Spine1')).toBeUndefined()
+  })
+
+  it('collects morph targets across several meshes (face, teeth, lashes...)', () => {
+    const root = new Group()
+    const face = morphMesh(['jawOpen', 'eyeBlinkLeft'])
+    const teeth = morphMesh(['jawOpen'])
+    root.add(face, teeth, new Mesh())
+    const bindings = buildBindings(root)
+    expect(bindings.get('jawOpen')).toEqual([{ mesh: face, index: 0 }, { mesh: teeth, index: 0 }])
+    expect(bindings.get('eyeBlinkLeft')).toEqual([{ mesh: face, index: 1 }])
+    expect(bindings.has('mouthSmile')).toBe(false)
+  })
+
+  it('reports exactly which expected morph targets are missing', () => {
+    const root = new Group()
+    root.add(morphMesh(['jawOpen', 'someOtherShape']))
+    const report = reportMorphs(buildBindings(root))
+    expect(report.found).toEqual(['jawOpen'])
+    expect(report.missing).toHaveLength(EXPECTED_MORPHS.length - 1)
+    expect(report.missing).not.toContain('jawOpen')
+    expect(report.all).toEqual(['jawOpen', 'someOtherShape'])
+  })
+
+  it('a model with no morph targets reports everything missing', () => {
+    const report = reportMorphs(buildBindings(new Group()))
+    expect(report.found).toEqual([])
+    expect(report.missing).toHaveLength(EXPECTED_MORPHS.length)
   })
 })
 
 describe('camera framing', () => {
-  it('moves further back for a narrower (phone) window so the width still fits', () => {
+  it('fits the height on a wide window and the width on a tall phone', () => {
     const wide = frameDistance(24, 16 / 9, 0.86, 0.66)
-    const phone = frameDistance(24, 9 / 19, 0.86, 0.66)
-    expect(phone).toBeGreaterThan(wide)
+    const tall = frameDistance(24, 9 / 19, 0.86, 0.66)
+    expect(wide).toBeCloseTo(0.86 / 2 / Math.tan((24 * Math.PI) / 360), 6)
+    expect(tall).toBeGreaterThan(wide)
   })
-  it('the framed area really fits at the computed distance', () => {
-    const fov = 24
-    for (const aspect of [0.45, 1, 1.78]) {
-      const d = frameDistance(fov, aspect, 0.86, 0.66)
-      const viewH = 2 * d * Math.tan((fov * Math.PI) / 360)
-      expect(viewH).toBeGreaterThanOrEqual(0.86 - 1e-9)
-      expect(viewH * aspect).toBeGreaterThanOrEqual(0.66 - 1e-9)
-    }
+
+  it('moves back for a bigger region', () => {
+    expect(frameDistance(24, 1, 1.2, 0.9)).toBeGreaterThan(frameDistance(24, 1, 0.8, 0.6))
   })
 })
 
-describe('device checks', () => {
-  it('reports no WebGL in this test environment, so the fallback is used', () => {
+describe('WebGL detection', () => {
+  afterEach(() => { vi.restoreAllMocks(); delete (window as unknown as Record<string, unknown>).WebGLRenderingContext })
+
+  it('is false when the browser has no WebGL (as in this test environment)', () => {
     expect(isWebGLAvailable()).toBe(false)
   })
-  it('does not treat a desktop-sized window as mobile', () => {
-    Object.defineProperty(window, 'innerWidth', { value: 1280, configurable: true })
-    window.matchMedia = ((q: string) => ({ matches: false, media: q })) as unknown as typeof window.matchMedia
-    expect(isMobileDevice()).toBe(false)
-    Object.defineProperty(window, 'innerWidth', { value: 390, configurable: true })
+
+  it('is true when a WebGL context can be created', () => {
+    ;(window as unknown as Record<string, unknown>).WebGLRenderingContext = function () {}
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({} as never)
+    expect(isWebGLAvailable()).toBe(true)
+  })
+
+  it('is false when creating a context fails or throws', () => {
+    ;(window as unknown as Record<string, unknown>).WebGLRenderingContext = function () {}
+    const spy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext')
+    spy.mockReturnValue(null)
+    expect(isWebGLAvailable()).toBe(false)
+    spy.mockImplementation(() => { throw new Error('blocked') })
+    expect(isWebGLAvailable()).toBe(false)
+  })
+
+  it('detects touch devices and small screens for the lower pixel ratio', () => {
+    const original = window.matchMedia
+    window.matchMedia = (() => ({ matches: true })) as unknown as typeof window.matchMedia
     expect(isMobileDevice()).toBe(true)
+    window.matchMedia = (() => ({ matches: false })) as unknown as typeof window.matchMedia
+    expect(isMobileDevice()).toBe(window.innerWidth < 640)
+    window.matchMedia = original
   })
 })

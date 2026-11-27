@@ -1,103 +1,124 @@
 import { BlinkController, breathPitch, clamp, damp, headMotion } from './AvatarAnimation'
 import { STATES } from '../../state'
 
-/** A small deterministic random generator so the blink tests give the same result every run. */
-function seeded(seed: number) {
-  return () => {
-    seed |= 0; seed = (seed + 0x6d2b79f5) | 0
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
+/** A small seeded random generator so the tests are repeatable. */
+const seeded = (seed: number) => () => {
+  seed = (seed + 0x6d2b79f5) | 0
+  let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296
 }
 
-/** Counts blinks in `seconds` of simulated time at a fixed frame rate. */
-function countBlinks(fps: number, seconds: number, seed: number) {
-  const blink = new BlinkController(seeded(seed))
-  const dt = 1 / fps
-  let blinks = 0
-  let was = 0
-  let max = 0
-  let min = 1
-  for (let i = 0; i < seconds * fps; i++) {
-    const v = blink.update(dt)
-    max = Math.max(max, v); min = Math.min(min, v)
-    if (v > 0.5 && was <= 0.5) blinks++
-    was = v
-  }
-  return { blinks, max, min }
-}
-
-describe('damp (frame independent smoothing)', () => {
+describe('damp (frame-independent smoothing)', () => {
   it('moves towards the target without overshooting', () => {
     let v = 0
-    for (let i = 0; i < 100; i++) { v = damp(v, 1, 6, 1 / 60); expect(v).toBeLessThanOrEqual(1) }
+    for (let i = 0; i < 200; i++) {
+      const next = damp(v, 1, 6, 1 / 60)
+      expect(next).toBeGreaterThanOrEqual(v)
+      expect(next).toBeLessThanOrEqual(1)
+      v = next
+    }
     expect(v).toBeGreaterThan(0.99)
   })
-  it('gives the same result for one big step and many small steps', () => {
-    const once = damp(0, 1, 6, 0.5)
-    let many = 0
-    for (let i = 0; i < 50; i++) many = damp(many, 1, 6, 0.01)
-    expect(many).toBeCloseTo(once, 10)
+
+  it('gives the same result whatever the frame rate', () => {
+    let fine = 0
+    for (let i = 0; i < 10; i++) fine = damp(fine, 1, 5, 0.01)
+    expect(damp(0, 1, 5, 0.1)).toBeCloseTo(fine, 10)
   })
-  it('does not move when dt is 0', () => {
-    expect(damp(0.3, 1, 6, 0)).toBe(0.3)
+
+  it('does nothing for dt = 0 or lambda = 0', () => {
+    expect(damp(0.3, 1, 5, 0)).toBe(0.3)
+    expect(damp(0.3, 1, 0, 0.1)).toBe(0.3)
+  })
+
+  it('clamp keeps values in range', () => {
+    expect([clamp(-1), clamp(0.4), clamp(7), clamp(5, 0, 3)]).toEqual([0, 0.4, 1, 3])
   })
 })
 
-describe('natural blinking', () => {
-  it('blinks at a human rate (roughly 8 to 25 times a minute)', () => {
-    const { blinks } = countBlinks(60, 120, 7)
-    expect(blinks / 2).toBeGreaterThan(8)
-    expect(blinks / 2).toBeLessThan(25)
-  })
-  it('fully closes and fully opens, never leaving 0 to 1', () => {
-    const { max, min } = countBlinks(60, 60, 3)
-    expect(max).toBeCloseTo(1, 5)
-    expect(min).toBe(0)
-  })
-  it('blinks about as often at 30 fps as at 144 fps', () => {
-    const slow = countBlinks(30, 300, 11).blinks
-    const fast = countBlinks(144, 300, 11).blinks
-    expect(Math.abs(slow - fast)).toBeLessThanOrEqual(Math.ceil(fast * 0.1))
-  })
-  it('survives a huge frame gap without breaking', () => {
-    const blink = new BlinkController(seeded(1))
-    const v = blink.update(30)
-    expect(v).toBeGreaterThanOrEqual(0)
-    expect(v).toBeLessThanOrEqual(1)
-  })
-  it('stays open most of the time', () => {
-    const blink = new BlinkController(seeded(5))
-    let closed = 0
-    for (let i = 0; i < 6000; i++) if (blink.update(1 / 60) > 0.5) closed++
-    expect(closed / 6000).toBeLessThan(0.1)
-  })
-})
-
-describe('breathing and head movement', () => {
-  it('breathing is a small periodic tilt', () => {
+describe('BlinkController', () => {
+  const blinks = (fps: number, seconds: number, seed = 7) => {
+    const blink = new BlinkController(seeded(seed))
+    let count = 0
+    let wasClosed = false
+    let min = 1
     let max = 0
-    for (let t = 0; t < 20; t += 0.05) max = Math.max(max, Math.abs(breathPitch(t)))
-    expect(max).toBeGreaterThan(0.01)
-    expect(max).toBeLessThan(0.02)
-    expect(breathPitch(0)).toBeCloseTo(0)
+    for (let i = 0; i < seconds * fps; i++) {
+      const v = blink.update(1 / fps)
+      min = Math.min(min, v)
+      max = Math.max(max, v)
+      const closed = v >= 0.5
+      if (closed && !wasClosed) count++
+      wasClosed = closed
+    }
+    return { count, min, max }
+  }
+
+  it('starts with open eyes', () => {
+    expect(new BlinkController(seeded(1)).update(0.016)).toBe(0)
   })
-  it('head movement stays small in every state', () => {
-    for (const s of STATES) {
-      for (let t = 0; t < 60; t += 0.1) {
-        const h = headMotion(t, s, 1)
-        for (const a of [h.yaw, h.pitch, h.roll]) expect(Math.abs(a)).toBeLessThan(0.25)
-      }
+
+  it('blinks about every 2 to 6 seconds, sometimes twice quickly', () => {
+    const { count, min, max } = blinks(60, 120)
+    expect(count).toBeGreaterThanOrEqual(15)
+    expect(count).toBeLessThanOrEqual(45)
+    expect(min).toBe(0)
+    expect(max).toBe(1)
+  })
+
+  it('blinks the same amount at 30, 60 and 144 fps', () => {
+    const a = blinks(30, 120).count
+    const b = blinks(60, 120).count
+    const c = blinks(144, 120).count
+    expect(Math.abs(a - b)).toBeLessThanOrEqual(2)
+    expect(Math.abs(c - b)).toBeLessThanOrEqual(2)
+  })
+
+  it('stays within 0..1 and survives a very long frame (a hidden tab)', () => {
+    const blink = new BlinkController(seeded(3))
+    for (const dt of [0.016, 5, 0.5, 30, 0.016]) {
+      const v = blink.update(dt)
+      expect(v).toBeGreaterThanOrEqual(0)
+      expect(v).toBeLessThanOrEqual(1)
     }
   })
-  it('listening tilts the head, speaking adds nods with the voice level', () => {
-    expect(Math.abs(headMotion(0, 'listening').roll)).toBeGreaterThan(0.05)
-    expect(headMotion(2, 'speaking', 1).pitch).toBeGreaterThan(headMotion(2, 'speaking', 0).pitch)
+
+  it('a blink closes and then reopens smoothly', () => {
+    const blink = new BlinkController(() => 0) // shortest wait: 2.2 s, no double blink
+    const values: number[] = []
+    for (let i = 0; i < 60 * 3; i++) values.push(blink.update(1 / 60))
+    const peak = values.indexOf(1)
+    expect(peak).toBeGreaterThan(0)
+    expect(values[peak - 1]).toBeLessThan(1)
+    expect(values[values.length - 1]).toBe(0)
+    for (let i = 1; i < peak; i++) expect(values[i]).toBeGreaterThanOrEqual(values[i - 1])
   })
-  it('clamp keeps values in range', () => {
-    expect(clamp(5)).toBe(1)
-    expect(clamp(-2)).toBe(0)
-    expect(clamp(0.4)).toBe(0.4)
+})
+
+describe('head and breathing motion', () => {
+  it.each(STATES)('%s keeps head angles small (under 0.25 rad) for a whole minute', (state) => {
+    for (let t = 0; t < 60; t += 0.1) {
+      const m = headMotion(t, state, 1)
+      expect(Math.abs(m.yaw)).toBeLessThan(0.25)
+      expect(Math.abs(m.pitch)).toBeLessThan(0.25)
+      expect(Math.abs(m.roll)).toBeLessThan(0.25)
+    }
+  })
+
+  it('tilts the head when listening, tips it down on error, and nods more when louder', () => {
+    const avg = (state: Parameters<typeof headMotion>[1], pick: 'pitch' | 'roll', level = 0) => {
+      let s = 0
+      for (let t = 0; t < 60; t += 0.1) s += headMotion(t, state, level)[pick]
+      return s / 600
+    }
+    expect(avg('listening', 'roll')).toBeGreaterThan(0.04)
+    expect(avg('error', 'pitch')).toBeGreaterThan(0.08)
+    expect(avg('speaking', 'pitch', 1)).toBeGreaterThan(avg('speaking', 'pitch', 0) + 0.03)
+  })
+
+  it('breathing is small and repeats every 4.6 seconds', () => {
+    for (let t = 0; t < 20; t += 0.25) expect(Math.abs(breathPitch(t))).toBeLessThanOrEqual(0.014 + 1e-9)
+    expect(breathPitch(1.3)).toBeCloseTo(breathPitch(1.3 + 4.6), 9)
   })
 })

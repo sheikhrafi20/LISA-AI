@@ -1,9 +1,8 @@
-import { renderHook, act } from '@testing-library/react'
-import { STATES } from '../state'
-import type { AvatarEvent, LisaState } from '../types/avatar'
+import { act, renderHook } from '@testing-library/react'
 import { reducer, transition, useAvatarState } from './useAvatarState'
+import type { AvatarEvent, LisaState } from '../types/avatar'
 
-const EVENTS: AvatarEvent[] = ['START_LISTENING', 'STOP_LISTENING', 'SUBMIT', 'SPEAK_START', 'SPEAK_END', 'STOP_SPEAKING', 'CANCEL', 'ERROR', 'RESET']
+const start = { state: 'idle' as LisaState, error: null }
 
 describe('avatar state machine', () => {
   it.each<[LisaState, AvatarEvent, LisaState]>([
@@ -11,53 +10,70 @@ describe('avatar state machine', () => {
     ['idle', 'SUBMIT', 'processing'],
     ['listening', 'STOP_LISTENING', 'idle'],
     ['listening', 'SUBMIT', 'processing'],
+    ['listening', 'CANCEL', 'idle'],
     ['processing', 'SPEAK_START', 'speaking'],
+    ['processing', 'SPEAK_END', 'idle'],
     ['processing', 'CANCEL', 'idle'],
     ['speaking', 'SPEAK_END', 'idle'],
     ['speaking', 'STOP_SPEAKING', 'idle'],
     ['speaking', 'START_LISTENING', 'listening'],
     ['error', 'RESET', 'idle'],
     ['error', 'START_LISTENING', 'listening'],
+    ['error', 'SUBMIT', 'processing'],
   ])('%s + %s -> %s', (from, event, to) => {
     expect(transition(from, event)).toBe(to)
   })
 
-  it('ERROR leads to the error state from every other state', () => {
-    for (const s of STATES.filter((x) => x !== 'error')) expect(transition(s, 'ERROR')).toBe('error')
+  it.each<[LisaState, AvatarEvent]>([
+    ['idle', 'SPEAK_END'],
+    ['idle', 'STOP_LISTENING'],
+    ['listening', 'SPEAK_START'],
+    ['processing', 'START_LISTENING'],
+    ['processing', 'STOP_SPEAKING'],
+    ['speaking', 'SUBMIT'],
+    ['error', 'SPEAK_START'],
+  ])('ignores %s + %s', (from, event) => {
+    expect(transition(from, event)).toBe(from)
   })
 
-  it('ignores events that make no sense in the current state', () => {
-    expect(transition('idle', 'STOP_SPEAKING')).toBe('idle')
-    expect(transition('idle', 'SPEAK_END')).toBe('idle')
-    expect(transition('listening', 'SPEAK_START')).toBe('listening')
-    expect(transition('error', 'STOP_LISTENING')).toBe('error')
+  it('every state can reach the error state and recover from it', () => {
+    for (const s of ['idle', 'listening', 'processing', 'speaking'] as LisaState[]) {
+      const failed = reducer({ state: s, error: null }, { type: 'ERROR', message: 'boom' })
+      expect(failed).toEqual({ state: 'error', error: 'boom' })
+      expect(reducer(failed, { type: 'RESET' })).toEqual({ state: 'idle', error: null })
+    }
   })
 
-  it('every transition lands on a real state', () => {
-    for (const s of STATES) for (const e of EVENTS) expect(STATES).toContain(transition(s, e))
+  it('uses a default message and updates it on a repeated error', () => {
+    const first = reducer(start, { type: 'ERROR' })
+    expect(first.error).toBe('Something went wrong')
+    expect(reducer(first, { type: 'ERROR', message: 'second' }).error).toBe('second')
   })
 
-  it('keeps the same object for ignored events and stores the error message', () => {
-    const idle = { state: 'idle' as const, error: null }
-    expect(reducer(idle, { type: 'STOP_SPEAKING' })).toBe(idle)
-    const failed = reducer(idle, { type: 'ERROR', message: 'Microphone blocked' })
-    expect(failed).toEqual({ state: 'error', error: 'Microphone blocked' })
-    expect(reducer(failed, { type: 'ERROR', message: 'Second problem' }).error).toBe('Second problem')
-    expect(reducer(failed, { type: 'RESET' })).toEqual({ state: 'idle', error: null })
+  it('returns the very same object for ignored events, so React does not re-render', () => {
+    expect(reducer(start, { type: 'SPEAK_END' })).toBe(start)
   })
 
-  it('works as a hook', () => {
+  it('clears the error message when leaving the error state', () => {
+    const failed = reducer(start, { type: 'ERROR', message: 'x' })
+    expect(reducer(failed, { type: 'START_LISTENING' }).error).toBeNull()
+  })
+
+  it('hook: a normal conversation goes idle > listening > processing > speaking > idle', () => {
     const { result } = renderHook(() => useAvatarState())
-    expect(result.current.state).toBe('idle')
-    act(() => result.current.send('START_LISTENING'))
-    expect(result.current.state).toBe('listening')
-    act(() => result.current.send('SUBMIT'))
-    act(() => result.current.send('SPEAK_START'))
+    const seen: LisaState[] = [result.current.state]
+    for (const event of ['START_LISTENING', 'SUBMIT', 'SPEAK_START', 'SPEAK_END'] as AvatarEvent[]) {
+      act(() => result.current.send(event))
+      seen.push(result.current.state)
+    }
+    expect(seen).toEqual(['idle', 'listening', 'processing', 'speaking', 'idle'])
+  })
+
+  it('hook: force jumps to any state (development preview only)', () => {
+    const { result } = renderHook(() => useAvatarState())
+    act(() => result.current.force('speaking'))
     expect(result.current.state).toBe('speaking')
-    act(() => result.current.send('ERROR', 'Network down'))
-    expect(result.current.state).toBe('error')
-    expect(result.current.error).toBe('Network down')
-    act(() => result.current.force('idle'))
-    expect(result.current.state).toBe('idle')
+    act(() => result.current.force('error'))
+    expect(result.current.error).not.toBeNull()
   })
 })
